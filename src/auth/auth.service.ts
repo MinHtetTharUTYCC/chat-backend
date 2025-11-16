@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, Req, Res } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from "bcrypt";
@@ -10,7 +10,12 @@ export class AuthService {
     constructor(
         private jwt: JwtService,
         private readonly usersService: UsersService,
-    ) { }
+    ) {
+        console.log("DEPENDEN:::", {
+            dep1: JwtService,
+            dep2: UsersService,
+        })
+    }
 
     async getTokens(userId: string) {
         const accessToken = await this.jwt.signAsync(
@@ -19,12 +24,15 @@ export class AuthService {
             },
             {
                 secret: process.env.JWT_ACCESS_SECRET,
-                expiresIn: '15min',
+                expiresIn: '1h',
             }
         );
 
         const refreshToken = await this.jwt.signAsync(
-            { sub: userId },
+            {
+                sub: userId
+
+            },
             {
                 secret: process.env.JWT_REFRESH_SECRET,
                 expiresIn: '7d',
@@ -87,7 +95,7 @@ export class AuthService {
 
     async refreshTokens(userId: string, oldRefreshToken: string) {
 
-        const user = await this.usersService.findUserById(userId);
+        const user = await this.usersService.getRefreshTokenOfUser(userId);
         if (!user || !user.refreshToken) {
             throw new ForbiddenException('Access Denied');
         }
@@ -95,12 +103,16 @@ export class AuthService {
         const rtMatches = await bcrypt.compare(oldRefreshToken, user.refreshToken)
         if (!rtMatches) throw new ForbiddenException("Invalid refresh token");
 
-        const tokens = await this.getTokens(userId);
+        const newTokens = await this.getTokens(userId);
 
-        const hashed = await bcrypt.hash(tokens.refreshToken, 10);
+        const hashed = await bcrypt.hash(newTokens.refreshToken, 10);
         await this.usersService.updateRefreshToken(userId, hashed);
 
-        return tokens;
+        return newTokens;
+    }
+
+    async logout(userId: string) {
+        await this.usersService.deleteRefreshToken(userId);
     }
 }
 

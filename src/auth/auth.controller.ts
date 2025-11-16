@@ -1,9 +1,12 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
-import type { Response } from 'express';
+// import type { Response } from 'express';
+import express from 'express';
 import { RegisterDto } from './dto/register.dto';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -12,7 +15,7 @@ export class AuthController {
 
     @HttpCode(HttpStatus.OK)
     @Post('/login')
-    async login(@Body(ValidationPipe) dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    async login(@Body(ValidationPipe) dto: LoginDto, @Res({ passthrough: true }) res: express.Response) {
         const { accessToken, refreshToken, user } = await this.authService.login(dto);
 
         // set refres tokens only in httpOnly cookie
@@ -31,7 +34,8 @@ export class AuthController {
 
     @HttpCode(HttpStatus.CREATED)
     @Post('/register')
-    async register(@Body(ValidationPipe) dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+    async register(@Body(ValidationPipe) dto: RegisterDto, @Res({ passthrough: true }) res: express.Response) {
+        console.log("REGISTER>>>>>.")
         const { accessToken, refreshToken, user } = await this.authService.register(dto);
 
         // set refresh tokens only in HttpOnly cookie
@@ -46,14 +50,17 @@ export class AuthController {
             accessToken,
             user
         };
-    }
+    };
 
     @Post('/refresh')
     @UseGuards(JwtRefreshGuard)
-    async refresh(@Req() req, @Res() res: Response) {
+    async refresh(@Req() req, @Res({ passthrough: true }) res: express.Response) {
         const userId = req.user.sub;
         const oldRT = req.user.refreshToken;
 
+        console.log("OLDRT:", oldRT)
+
+        // Generate new tokens
         const { accessToken, refreshToken } = await this.authService.refreshTokens(userId, oldRT);
 
         res.cookie("refresh_token", refreshToken, {
@@ -64,5 +71,25 @@ export class AuthController {
         });
 
         return res.json({ accessToken })
+    }
+
+    @Post('/logout')
+    @UseGuards(JwtAuthGuard)
+    async logout(@Req() req, @Res({ passthrough: true }) res: express.Response) {
+        const userId = req.user.sub;
+
+        // clear refreshToken at DB
+        await this.authService.logout(userId);
+
+        //clear cookie in client
+        res.clearCookie("refresh_token", {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            path: '/auth/refresh',
+        });
+
+        return { message: 'Logged out successfully' }
+
     }
 }

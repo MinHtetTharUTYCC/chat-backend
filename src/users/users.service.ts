@@ -2,13 +2,17 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { LoginDto } from 'src/auth/dto/login.dto';
 import { RegisterDto } from 'src/auth/dto/register.dto';
 import { DatabaseService } from 'src/database/database.service';
-
 import bcrypt from "bcrypt";
 
 @Injectable()
 export class UsersService {
 
-    constructor(private readonly databaseService: DatabaseService) { }
+    constructor(private readonly databaseService: DatabaseService) {
+        console.log("DEPENDEN:::", {
+            dep1: DatabaseService,
+
+        })
+    }
 
 
     async userExistsByMail(email: string): Promise<boolean> {
@@ -18,7 +22,6 @@ export class UsersService {
             }
         })
         return !!user;
-
     }
 
     async createNewUser(registerDto: RegisterDto) {
@@ -42,7 +45,7 @@ export class UsersService {
 
     //for login
     async validateUser(loginDto: LoginDto) {
-        const user = await this.databaseService.user.findUnique({ where: { email: loginDto.email } });
+        const user = await this.databaseService.user.findUnique({ where: { email: loginDto.email }, select: { id: true, username: true, email: true, password: true } });
         if (!user) throw new NotFoundException("User Not Found")
 
         const isPwdValid = await bcrypt.compare(loginDto.password, user.password);
@@ -53,23 +56,42 @@ export class UsersService {
         return { ...cleanUser };
     }
 
-
-
     // for refresh
-    async findUserById(userId: string) {
-        const user = this.databaseService.user.findUnique({ where: { id: userId } })
+    async getRefreshTokenOfUser(userId: string) {
+        const user = this.databaseService.user.findUnique({ where: { id: userId }, select: { id: true, refreshToken: true } })
         if (!user) throw new NotFoundException("User not found");
         return user;
     }
 
     // for saving new refresh token
     async updateRefreshToken(userId: string, hashedRT: string) {
+        console.log("UPDATE Rtoken at DB: ", hashedRT)
         await this.databaseService.user.update({
             where: { id: userId },
             data: {
                 refreshToken: hashedRT,
             }
         })
+    }
+
+
+    // For log out
+    async deleteRefreshToken(userId: string) {
+        await this.databaseService.user.update({
+            where: { id: userId },
+            data: {
+                refreshToken: null,
+            }
+        })
+    }
+
+
+
+    // get user info
+    async getUserInfo(userId: string) {
+        const user = this.databaseService.user.findUnique({ where: { id: userId }, select: { id: true, username: true, email: true } })
+        if (!user) throw new NotFoundException("User not found");
+        return user;
     }
 
 }
