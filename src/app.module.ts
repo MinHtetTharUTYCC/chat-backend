@@ -9,10 +9,12 @@ import { ChatModule } from './chat/chat.module';
 import { MessageService } from './message/message.service';
 import { MessageModule } from './message/message.module';
 import { DatabaseService } from './database/database.service';
+import { PresenceService } from './presence/presence.service';
+import { PresenceModule } from './presence/presence.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule],
   controllers: [AppController],
-  providers: [AppService, MessageService, DatabaseService],
+  providers: [AppService, MessageService, DatabaseService, PresenceService],
 })
 export class AppModule { }

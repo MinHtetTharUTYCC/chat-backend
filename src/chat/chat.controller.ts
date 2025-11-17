@@ -24,12 +24,13 @@ export class ChatController {
         return this.chatService.startChat(req.user.sub, startChatDto.otherUserId);
     }
 
-    @Get("/:chatId.messages")
+    @Get("/:chatId/messages")
     @UseGuards(JwtAuthGuard)
     async getMessages(@Param('chatId') chatId: string, @Req() req) {
         return this.messageService.getMessages(chatId, req.user.sub)
     }
 
+    // This route is not ideal,(only for testing), (it shuld be done via Socket)
     @Post('/:chatId/messages')
     @UseGuards(JwtAuthGuard)
     async sendMessage(@Req() req, @Body(ValidationPipe) sendMessageDto: SendMessageDto) {

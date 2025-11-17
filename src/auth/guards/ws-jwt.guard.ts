@@ -3,7 +3,10 @@ import { JwtService } from "@nestjs/jwt";
 
 @Injectable()
 export class WSJwtGuard implements CanActivate {
-    constructor(private jwt: JwtService) { }
+    constructor(private jwt: JwtService) {
+        console.log("GUARD IS RUNNING:::;")
+    }
+
 
     canActivate(context: ExecutionContext): boolean {
         const client = context.switchToWs().getClient();
@@ -13,6 +16,8 @@ export class WSJwtGuard implements CanActivate {
         if (!token) {
             throw new UnauthorizedException('Missing token');
         }
+
+        console.log('token at WS is: ', token)
 
         try {
             const payload = this.jwt.verify(token, { secret: process.env.JWT_ACCESS_SECRET });
@@ -27,7 +32,7 @@ export class WSJwtGuard implements CanActivate {
         }
     }
 
-    getRequest(context: ExecutionContext) {
-        return context.switchToWs().getClient().handshake;
-    }
+    // getRequest(context: ExecutionContext) {
+    //     return context.switchToWs().getClient().handshake;
+    // }
 }
