@@ -15,12 +15,47 @@ datasource db {
 }
 
 model User {
-  id       String @id @default(cuid())
-  username String @unique
-  email    String @unique
-  password String
-
+  id           String  @id @default(cuid())
+  username     String  @unique
+  email        String  @unique
+  password     String
   refreshToken String?
 
   createdAt DateTime @default(now())
+
+  messages     Message[]
+  participants Participant[]
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  title     String?
+  isGroup   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants Participant[]
+  messages     Message[]
+}
+
+model Participant {
+  id     String @id @default(cuid())
+  userId String
+  chatId String
+
+  user User @relation(fields: [userId], references: [id])
+  chat Chat @relation(fields: [chatId], references: [id])
+}
+
+model Message {
+  id      String @id @default(cuid())
+  content String
+
+  chatId   String
+  senderId String
+
+  createdAt DateTime @default(now())
+
+  chat   Chat @relation(fields: [chatId], references: [id])
+  sender User @relation(fields: [senderId], references: [id])
 }

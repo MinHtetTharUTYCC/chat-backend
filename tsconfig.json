@@ -20,6 +20,9 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  }
+    "noFallthroughCasesInSwitch": false,
+
+    "typeRoots": ["./ndoe_modules/@types","./src/types"]
+  },
+  "include": ["src/**/*"]
 }
