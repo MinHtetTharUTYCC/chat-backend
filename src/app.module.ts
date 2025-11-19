@@ -11,10 +11,11 @@ import { MessageModule } from './message/message.module';
 import { DatabaseService } from './database/database.service';
 import { PresenceService } from './presence/presence.service';
 import { PresenceModule } from './presence/presence.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule],
   controllers: [AppController],
-  providers: [AppService, MessageService, DatabaseService, PresenceService],
+  providers: [AppService],
 })
 export class AppModule { }

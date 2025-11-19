@@ -1,14 +1,20 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
-import { DatabaseService } from 'src/database/database.service';
-import { MessageService } from 'src/message/message.service';
 import { ChatGateway } from './chat.gateway';
-import { JwtService } from '@nestjs/jwt';
-import { PresenceService } from 'src/presence/presence.service';
+import { JwtModule } from '@nestjs/jwt';
+import { DatabaseModule } from 'src/database/database.module';
+import { MessageModule } from 'src/message/message.module';
+import { PresenceModule } from 'src/presence/presence.module';
 
 @Module({
+  imports: [DatabaseModule, MessageModule, forwardRef(() => PresenceModule),
+    JwtModule.register({
+      secret: process.env.JWT_ACCESS_SECRET!,
+    })],
   controllers: [ChatController],
-  providers: [ChatService, DatabaseService, MessageService, ChatGateway, JwtService, PresenceService]
+  providers: [ChatService, ChatGateway],
+  exports: [ChatService]
 })
 export class ChatModule { }
+

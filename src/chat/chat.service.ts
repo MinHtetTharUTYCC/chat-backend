@@ -130,4 +130,53 @@ export class ChatService {
         return newChat;
     }
 
+
+    async getMyFriendsIds(userId: string) {
+        const chats = await this.databaseService.chat.findMany({
+            where: {
+                participants: {
+                    some: { userId }
+                }
+            },
+            select: {
+                participants: {
+                    select: { userId: true }
+                }
+            }
+        });
+
+        // extract all participants ID except me
+        const friendIds = new Set<string>();
+
+        for (const chat of chats) {
+            for (const participant of chat.participants) {
+                if (participant.userId !== userId) {
+                    friendIds.add(participant.userId);
+                }
+            }
+        }
+
+        return Array.from(friendIds);
+    }
+
+
+    async getMyChatsIds(userId: string) {
+        const chats = await this.databaseService.chat.findMany({
+            where: {
+                participants: {
+                    some: {
+                        userId,
+                    }
+                }
+            },
+            select: {
+                id: true,
+            }
+        });
+
+        return chats.map(chat => chat.id);
+    }
+
+
+
 }

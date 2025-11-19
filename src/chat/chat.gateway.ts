@@ -1,7 +1,5 @@
-import { UseGuards } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
-import { WSJwtGuard } from 'src/auth/guards/ws-jwt.guard';
 import { SendMessageDto } from './dto/sendMessage.dto';
 import { MessageService } from 'src/message/message.service';
 import { ChatService } from './chat.service';
@@ -53,22 +51,42 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     }
     console.log("Client connected: ", userId)
 
-    const chats = await this.chatService.getChats(userId);
-
-    chats.forEach(chat => client.join(`chat_${chat.id}`));
-    console.log("User: ", userId, ' joined rooms: ', chats.map(c => c.id));
-
     // set presence Status
-    this.presenceService.setOnline(userId)
+    this.presenceService.setOnline(userId);
 
-    // ping to everyone
-    this.server.emit('prsence_update', {
-      userId,
-      online: true,
-    })
+    // Join a personal room so others can find me
+    // This allows the server to send messages specifically to this user later
+    await client.join(`user_${userId}`);
+
+    const chatsIds = await this.chatService.getMyChatsIds(userId);
+
+    for (const chatId in chatsIds) {
+      client.join(`chat_${chatId}`)
+    }
+    console.log("User: ", userId, ` joined ${chatsIds.length} rooms: `, chatsIds);
+
+    const friendsIds = await this.chatService.getMyFriendsIds(userId);
+    const onlineFriends = new Set<string>()
+
+    for (const friId in friendsIds) {
+      onlineFriends.add(`user_${friId}`)
+    }
+
+
+    // Send presence update ONLY to relevant users
+    // 'to(Array)' sends the message to all those specific rooms at once
+    const friendRooms = Array.from(onlineFriends);
+
+    if (friendRooms.length > 0) {
+      this.server.to(friendRooms).emit('presence_update', {
+        userId,
+        online: true,
+        lastSeen: null,
+      })
+    }
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     const userId = client.data.user.sub; //from ws-jwt guard
     if (!userId) return;
 
@@ -77,12 +95,22 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     //set presence Status
     this.presenceService.setOffline(userId);
 
-    // ping to everyone
-    this.server.emit('presence_update', {
-      userId,
-      online: false,
-    })
+    const friendsIds = await this.chatService.getMyFriendsIds(userId);
+    const onlineFriends = new Set<string>()
 
+    for (const friId in friendsIds) {
+      onlineFriends.add(`user_${friId}`)
+    }
+
+    const friendRooms = Array.from(onlineFriends);
+    if (friendRooms.length > 0) {
+      this.server.to(friendRooms).emit('presence_update', {
+        userId,
+        online: false,
+        lastSeen: Date.now()
+      })
+
+    }
   }
 
 
@@ -92,7 +120,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     // SAVE to DB 
     // This is REQURIED ********
-    // await this.messageService.sendMessage(senderId, sendMessageDto)
+    await this.messageService.sendMessage(senderId, sendMessageDto)
 
     const message = {
       ...sendMessageDto,
@@ -102,6 +130,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     // emit to the ROOM(clients/participants will join the Room using chatId)
     this.server.to(`chat_${sendMessageDto.chatId}`).emit('new_message', message)
+    console.log("NEW MESSAGE: ", message)
   }
 
   @SubscribeMessage('join_chat')
