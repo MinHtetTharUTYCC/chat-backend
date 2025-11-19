@@ -5,6 +5,8 @@ import { MessageService } from 'src/message/message.service';
 import { ChatService } from './chat.service';
 import { PresenceService } from 'src/presence/presence.service';
 import { JwtService } from '@nestjs/jwt';
+import { UsePipes, ValidationPipe } from '@nestjs/common';
+import { TypingDto } from './dto/typing.dto';
 
 @WebSocketGateway({
   cors: {
@@ -136,5 +138,44 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @SubscribeMessage('join_chat')
   handleJoinChat(@ConnectedSocket() client: Socket, @MessageBody() chatId: string) {
     client.join(chatId)
+  }
+
+  @SubscribeMessage('typing')
+  @UsePipes(new ValidationPipe())
+  async hanldeTyping(@ConnectedSocket() client: Socket, @MessageBody() payload: TypingDto) {
+    const userId = client.data.user.sub;
+    const roomName = `chat_${payload.chatId}`;
+
+    // ensures user is joining the room
+    const rooms = client.rooms;
+    if (!rooms.has(roomName)) return;
+
+    // .volatile: "if the network is busy, drop this packet"(not critical enough)
+    client.to(roomName).volatile.emit('user_typing', {
+      userId,
+      chatId: payload.chatId,
+      isTyping: payload.isTyping,
+    })
+
+
+    // frontend
+    // let typingTimeout = null;
+    // function onKeyDown() {
+    //   // 1. If not already typing, tell server we started
+    //   if (!isTyping) {
+    //     socket.emit('typing', { conversationId: 1, isTyping: true });
+    //     isTyping = true;
+    //   }
+
+    //   // 2. Clear previous timeout
+    //   clearTimeout(typingTimeout);
+
+    //   // 3. Set a new timeout to stop typing after 2 seconds of inactivity
+    //   typingTimeout = setTimeout(() => {
+    //     socket.emit('typing', { conversationId: 1, isTyping: false });
+    //     isTyping = false;
+    //   }, 2000);
+    // }
+
   }
 }

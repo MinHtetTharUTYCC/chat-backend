@@ -1,5 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
+import { title } from 'process';
+import { AddToChatDto } from './dto/add-to-chat.dto';
+import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 
 @Injectable()
 export class ChatService {
@@ -175,6 +179,161 @@ export class ChatService {
         });
 
         return chats.map(chat => chat.id);
+    }
+
+
+    async getChatInfo(chatId: string) {
+        return this.databaseService.chat.findUnique({
+            where: { id: chatId },
+            include: {
+                participants: {
+                    select: {
+                        id: true,
+                        userId: true,
+                        user: {
+                            select: {
+                                username: true,
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    async isParticipant(userId: string, chatId: string): Promise<boolean> {
+        const count = await this.databaseService.chat.count({
+            where: {
+                id: chatId,
+                participants: {
+                    some: { userId }
+                }
+            },
+        });
+
+        return count > 0;
+    }
+
+
+    async updateChatTitle(userId: string, chatId: string, dto: UpdateChatTitleDto) {
+        const chat = await this.databaseService.chat.findUnique({
+            where: { id: chatId, participants: { some: { userId } } },
+            select: {
+                id: true,
+                isGroup: true,
+            }
+        })
+
+        if (!chat) throw new NotFoundException("Chat not found")
+
+        if (!chat.isGroup) throw new ForbiddenException("Direct messages cannot have custom titles")
+
+        const dataToUpdate = {
+            title: dto.title === '' ? null : dto.title,
+        }
+
+        await this.databaseService.chat.update({
+            where: { id: chatId },
+            data: dataToUpdate,
+        });
+
+        return {
+            success: true,
+            chatId,
+            title: dto.title,
+        }
+    }
+
+    async createGroupChat(userId: string, dto: CreateGroupChatDto) {
+        // Set: for removing dupblicates
+        const uniqueUserIds = new Set<string>([
+            ...dto.userIds,
+            userId,
+        ])
+        const usersToParticipate = Array.from(uniqueUserIds).map(id => ({ userId: id }))
+        console.log("USERS to parti:", usersToParticipate)
+
+        if (usersToParticipate.length < 2) {
+            throw new BadRequestException("A group must have at least 2 participants")
+        }
+
+        const groupChat = await this.databaseService.chat.create({
+            data: {
+                isGroup: true,
+                title: dto.title || 'New Group',
+                participants: {
+                    create: usersToParticipate,
+                }
+            },
+            include: {
+                participants: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        return groupChat;
+    }
+
+    async addToChat(userId: string, chatId: string, dto: AddToChatDto) {
+        const chat = await this.databaseService.chat.findUnique({
+            where: { id: chatId },
+            select: {
+                isGroup: true,
+                participants: {
+                    where: {
+                        userId,
+                    },
+                    select: {
+                        id: true
+                    }
+                }
+            }
+        })
+        if (!chat) throw new NotFoundException("Chat not found")
+        if (chat.participants.length === 0) throw new ForbiddenException("You are not a member of this chat")
+        if (!chat.isGroup) throw new ForbiddenException("You cannot add members to 1-on-1 chat. Create a group instead.")
+
+        const newUsersToParticipate = dto.userIds.map((id) => ({ userId: id }));
+
+        try {
+            const updatedChat = await this.databaseService.chat.update({
+                where: {
+                    id: chatId,
+                },
+                data: {
+                    participants: {
+                        create: newUsersToParticipate,
+                    }
+                },
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            return updatedChat;
+        } catch (error) {
+            if (error.code === 'P2025') {
+                throw new BadRequestException("One or more users do not exist")
+            }
+            throw error;
+        }
     }
 
 
