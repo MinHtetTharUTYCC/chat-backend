@@ -3,6 +3,7 @@ import { LoginDto } from 'src/auth/dto/login.dto';
 import { RegisterDto } from 'src/auth/dto/register.dto';
 import { DatabaseService } from 'src/database/database.service';
 import bcrypt from "bcrypt";
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -85,13 +86,72 @@ export class UsersService {
         })
     }
 
-
-
     // get user info
-    async getUserInfo(userId: string) {
-        const user = this.databaseService.user.findUnique({ where: { id: userId }, select: { id: true, username: true, email: true } })
+    async getMe(userId: string) {
+        const user = this.databaseService.user.findUnique({
+            where: {
+                id: userId
+            },
+            select: {
+                id: true,
+                username: true,
+                email: true
+            }
+        });
+
         if (!user) throw new NotFoundException("User not found");
         return user;
+    }
+
+    async viewUser(userId: string, viewUserId: string) {
+
+        const [user, chat] = await Promise.all([
+            this.databaseService.user.findUnique({
+                where: { id: viewUserId },
+                select: {
+                    id: true,
+                    username: true,
+                    createdAt: true,
+                }
+            }),
+            await this.databaseService.chat.findFirst({
+                where: {
+                    isGroup: false,
+                    AND: [
+                        { participants: { some: { userId } } },
+                        { participants: { some: { userId: viewUserId } } }
+                    ]
+                },
+                select: {
+                    id: true,
+                }
+            })
+        ]);
+
+        if (!user) throw new NotFoundException("User not found")
+
+        return {
+            user,
+            chatId: chat?.id || null, //to go/redirect if chat exists
+        }
+    }
+
+    async updateUser(userId: string, dto: UpdateUserDto) {
+        const user = await this.databaseService.user.update({
+            where: { id: userId },
+            data: {
+                username: dto.username,
+            },
+            select: {
+                id: true,
+                username: true,
+            }
+        });
+
+        return {
+            success: true,
+            username: user.username,
+        }
     }
 
 }

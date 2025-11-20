@@ -9,9 +9,10 @@ import { ChatModule } from './chat/chat.module';
 import { MessageModule } from './message/message.module';
 import { PresenceModule } from './presence/presence.module';
 import { RedisModule } from './redis/redis.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule, SearchModule],
   controllers: [AppController],
   providers: [AppService],
 })

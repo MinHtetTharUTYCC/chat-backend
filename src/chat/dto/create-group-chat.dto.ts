@@ -13,5 +13,4 @@ export class CreateGroupChatDto {
     userIds: string[];
 
 
-
 }

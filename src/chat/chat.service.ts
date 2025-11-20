@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
 import { title } from 'process';
 import { AddToChatDto } from './dto/add-to-chat.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
+import { RemoveFromGroupChatDto } from './dto/remove-from-group-chat.dto';
 
 @Injectable()
 export class ChatService {
@@ -214,7 +215,6 @@ export class ChatService {
         return count > 0;
     }
 
-
     async updateChatTitle(userId: string, chatId: string, dto: UpdateChatTitleDto) {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId, participants: { some: { userId } } },
@@ -251,7 +251,6 @@ export class ChatService {
             userId,
         ])
         const usersToParticipate = Array.from(uniqueUserIds).map(id => ({ userId: id }))
-        console.log("USERS to parti:", usersToParticipate)
 
         if (usersToParticipate.length < 2) {
             throw new BadRequestException("A group must have at least 2 participants")
@@ -336,6 +335,55 @@ export class ChatService {
         }
     }
 
+    async joinGroup(userId: string, chatId: string) {
+        const existingParticipant = await this.databaseService.participant.findUnique({
+            where: {
+                userId_chatId: {
+                    userId,
+                    chatId
+                }
+            },
+            select: {
+                id: true,
+            }
+        });
+        if (existingParticipant) throw new ConflictException("Already joined the chat");
 
+        const participant = await this.databaseService.participant.create({
+            data: {
+                userId,
+                chatId
+            },
+            select: {
+                id: true,
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                    }
+                }
+            }
+        });
 
+        return participant;
+    }
+
+    async leaveGroup(userId: string, chatId: string) {
+        const isParticipant = await this.isParticipant(userId, chatId);
+        if (!isParticipant) throw new ForbiddenException("You are not a member of this chat")
+
+        await this.databaseService.participant.delete({
+            where: {
+                userId_chatId: {
+                    userId,
+                    chatId,
+                }
+            },
+        });
+
+        return {
+            success: true,
+            message: 'Successfully leaved the chat'
+        }
+    }
 }

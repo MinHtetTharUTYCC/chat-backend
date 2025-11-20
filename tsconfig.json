@@ -22,7 +22,9 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
 
-    "typeRoots": ["./ndoe_modules/@types","./src/types"]
+    "typeRoots": ["./node_modules/@types","./src/types"],
+    "types": ["jest","node"]
   },
   "include": ["src/**/*"]
 }
+

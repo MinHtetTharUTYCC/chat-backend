@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { EditMessageDto } from 'src/chat/dto/edit-message.dto';
 import { SendMessageDto } from 'src/chat/dto/sendMessage.dto';
 import { DatabaseService } from 'src/database/database.service';
 
@@ -59,6 +60,57 @@ export class MessageService {
                 }
             }
         })
+    }
 
+
+    async deleteMessage(userId: string, chatId: string, messageId: string) {
+        const existingParticipant = await this.databaseService.participant.findUnique({
+            where: {
+                userId_chatId: {
+                    userId,
+                    chatId,
+                }
+            }
+        });
+
+        if (!existingParticipant) throw new ForbiddenException("Your are not a member of this chat")
+
+        const result = await this.databaseService.message.deleteMany({
+            where: {
+                id: messageId,
+                senderId: userId,
+                chatId,
+            }
+        });
+
+        if (result.count === 0) throw new NotFoundException("Message not found or you are not the sender")
+
+        return {
+            success: true,
+            message: "Successfully deleted the message"
+        }
+    }
+
+    async editMessage(userId: string, chatId: string, messageId: string, dto: EditMessageDto) {
+        const message = await this.databaseService.message.findFirst({
+            where: {
+                id: messageId,
+                senderId: userId,
+                chatId: chatId,
+            }
+        })
+
+        if (!message) throw new NotFoundException("Message not found or you are not the sender")
+
+        const updatedMessage = await this.databaseService.message.update({
+            where: {
+                id: messageId,
+            },
+            data: {
+                content: dto.content,
+            }
+        })
+
+        return updatedMessage;
     }
 }

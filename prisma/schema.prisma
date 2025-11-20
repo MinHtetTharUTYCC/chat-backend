@@ -43,8 +43,10 @@ model Participant {
   userId String
   chatId String
 
-  user User @relation(fields: [userId], references: [id])
-  chat Chat @relation(fields: [chatId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatId])
 }
 
 model Message {
@@ -55,7 +57,8 @@ model Message {
   senderId String
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  chat   Chat @relation(fields: [chatId], references: [id])
-  sender User @relation(fields: [senderId], references: [id])
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
