@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { Message, NotificationType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { ChatGateway } from 'src/chat/chat.gateway';
@@ -18,35 +18,32 @@ export class MessageService {
     ) { }
 
     async sendMessage(userId: string, chatId: string, sendMessageDto: SendMessageDto) {
-        //check if check exists and user belong to it
-        // const chat = await this.databaseService.chat.findUnique({
-        //     where: { id: sendMessageDto.chatId },
-        //     include: { participants: true }
-        // });
-
-        // if (!chat) throw new NotFoundException("Chat not found")
-
-        // const isParticipant = chat.participants.some(p => p.userId === senderId)
-        // if (!isParticipant) throw new ForbiddenException("You are not a participant of this chat")
-
         await this.verifyMembership(userId, chatId);
 
-        // create message
-        const message = await this.databaseService.message.create({
-            data: {
-                ...sendMessageDto,
-                chatId,
-                senderId: userId,
-            },
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        username: true,
+        const message = await this.databaseService.$transaction(async (tx) => {
+            const newMessage = await tx.message.create({
+                data: {
+                    ...sendMessageDto,
+                    chatId,
+                    senderId: userId,
+                },
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            username: true,
+                        }
                     }
                 }
-            }
-        });
+            });
+
+            await tx.chat.update({
+                where: { id: chatId },
+                data: { lastMessageAt: new Date() }
+            });
+
+            return newMessage;
+        })
 
         // Broadcast via WS
         this.chatGateway.server.to(`chat_${chatId}`).emit('new_message', message)
@@ -318,9 +315,6 @@ export class MessageService {
         });
 
         if (!pinnedRecord) throw new NotFoundException("This message is not pinned");
-        console.log("PINNED REC ID", pinnedRecord.id)
-        console.log("PINNED USER ID", pinnedRecord.pinnedByUserId)
-        console.log("MY ID:", userId)
 
         //permissions (allow only to pin-creator or message-owner)
         const isPinCreator = pinnedRecord.pinnedByUserId === userId;
@@ -332,7 +326,8 @@ export class MessageService {
             where: {
                 id: pinnedRecord.id,
             }
-        })
+        });
+
         return {
             success: true,
             message: 'Successfully unpineed message'

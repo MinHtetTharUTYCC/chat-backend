@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-
 @Injectable()
 export class NotificationService {
     constructor(
@@ -34,25 +33,31 @@ export class NotificationService {
             }
         });
 
-        // let eventName: string;
-
-        // switch (dto.type) {
-        //     case NotificationType.MESSAGE_PINNED:
-        //         eventName = "pin_message";
-        //         break;
-        //     case NotificationType.NEW_CHAT:
-        //         eventName = "new_chat";
-        //         break;
-        //     case NotificationType.GROUP_ADDED:
-        //         eventName = 'new_group';
-        //         break;
-        //     default:
-        //         return;
-        // }
-
-        // this.chatGateway.server.to(`user_${dto.receiverId}`).emit(eventName, notification);
-
         return notification;
+    }
 
+    async getNotifications(userId: string, cursor?: string, limit: number = 20) {
+        const notifications = await this.databaseService.notification.findMany({
+            where: {
+                receiverId: userId,
+            },
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
+            take: limit,
+            orderBy: { createdAt: 'desc' }
+        });
+
+        let nextCursor: string | null = null;
+        if (notifications.length === limit) {
+            nextCursor = notifications[notifications.length - 1].id;
+        }
+
+        return {
+            data: notifications,
+            meta: {
+                nextCursor,
+                hasMore: nextCursor !== null,
+            }
+        }
     }
 }

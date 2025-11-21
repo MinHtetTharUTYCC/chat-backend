@@ -8,7 +8,7 @@ import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
 import { AddToChatDto } from './dto/add-to-chat.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
-import { MessagePaginationDto } from './dto/message-pagination.dto';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
@@ -31,7 +31,7 @@ export class ChatController {
     @Get("/:chatId/messages")
     async getMessages(@Param('chatId') chatId: string,
         @Req() req,
-        @Query(new ValidationPipe({ transform: true })) query: MessagePaginationDto) {
+        @Query(new ValidationPipe({ transform: true })) query: PaginationDto) {
         return this.messageService.getMessages(req.user.sub, chatId, query.cursor, query.limit)
     }
 
@@ -88,7 +88,7 @@ export class ChatController {
 
     @Post('/:chatId/participants')
     async addToChat(@Param('chatId') chatId: string, @Req() req, @Body(ValidationPipe) dto: AddToChatDto) {
-        return this.chatService.addToChat(req.user.sub, chatId, dto)
+        return this.chatService.addToGroupChat(req.user.sub, chatId, dto)
     }
 
     // NEED ROLE to do this

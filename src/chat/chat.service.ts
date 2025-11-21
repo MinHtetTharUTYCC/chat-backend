@@ -14,7 +14,6 @@ export class ChatService {
         private readonly databaseService: DatabaseService,
         private readonly chatGatway: ChatGateway,
         private readonly notificationService: NotificationService,
-
     ) { }
 
     async getChats(userId: string) {
@@ -42,9 +41,10 @@ export class ChatService {
                     }
                 }
             },
-            orderBy: {
-                updatedAt: 'desc',
-            }
+            orderBy: [
+                { lastMessageAt: 'desc' },
+                { updatedAt: 'desc' },
+            ]
         })
     }
 
@@ -264,7 +264,7 @@ export class ChatService {
 
     async createGroupChat(userId: string, dto: CreateGroupChatDto) {
         // Set: for removing dupblicates
-        const uniqueUserIds = new Set<string>([
+        let uniqueUserIds = new Set<string>([
             ...dto.userIds,
             userId,
         ])
@@ -296,10 +296,33 @@ export class ChatService {
             }
         });
 
+        uniqueUserIds.delete(userId);//deduct me
+        const usersToNotify = Array.from(uniqueUserIds).map(id => `user_${id}`);
+
+
+        await Promise.all(
+            Array.from(uniqueUserIds).map(async (id) => {
+                await this.notificationService.createNotification(
+                    userId,
+                    groupChat.id,
+                    {
+                        receiverId: id,
+                        type: NotificationType.GROUP_ADDED
+                    })
+            })
+        );
+
+        const socketPayload = {
+            type: NotificationType.GROUP_ADDED,
+            data: groupChat,
+            timestam: new Date()
+        }
+        this.chatGatway.server.to(usersToNotify).emit("group_added", socketPayload)
+
         return groupChat;
     }
 
-    async addToChat(userId: string, chatId: string, dto: AddToChatDto) {
+    async addToGroupChat(userId: string, chatId: string, dto: AddToChatDto) {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId },
             select: {
@@ -318,7 +341,9 @@ export class ChatService {
         if (chat.participants.length === 0) throw new ForbiddenException("You are not a member of this chat")
         if (!chat.isGroup) throw new ForbiddenException("You cannot add members to 1-on-1 chat. Create a group instead.")
 
-        const newUsersToParticipate = dto.userIds.map((id) => ({ userId: id }));
+        const uniqueUserIds = new Set(dto.userIds);
+        const newUsersToParticipate = Array.from(uniqueUserIds).map((id) => ({ userId: id }));
+        const newUsersToNotify = Array.from(uniqueUserIds).map(id => `user_${id}`);
 
         try {
             const updatedChat = await this.databaseService.chat.update({
@@ -344,6 +369,23 @@ export class ChatService {
                 }
             });
 
+            await Promise.all(
+                Array.from(uniqueUserIds).map(async (id) => {
+                    await this.notificationService.createNotification(userId, chatId, {
+                        receiverId: id,
+                        type: NotificationType.GROUP_ADDED,
+                    })
+                })
+            )
+
+            const sockerPayload = {
+                type: NotificationType.GROUP_ADDED,
+                data: updatedChat,
+                timestam: new Date(),
+            }
+
+            this.chatGatway.server.to(newUsersToNotify).emit("group_added", sockerPayload)
+
             return updatedChat;
         } catch (error) {
             if (error.code === 'P2025') {
@@ -367,7 +409,7 @@ export class ChatService {
         });
         if (existingParticipant) throw new ConflictException("Already joined the chat");
 
-        const participant = await this.databaseService.participant.create({
+        await this.databaseService.participant.create({
             data: {
                 userId,
                 chatId
@@ -383,7 +425,10 @@ export class ChatService {
             }
         });
 
-        return participant;
+        return {
+            success: true,
+            message: "Successfully joined the group chat."
+        };
     }
 
     async leaveGroup(userId: string, chatId: string) {
