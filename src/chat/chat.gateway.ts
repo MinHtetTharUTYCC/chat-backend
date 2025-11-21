@@ -1,13 +1,12 @@
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
-import { SendMessageDto } from './dto/sendMessage.dto';
-import { MessageService } from 'src/message/message.service';
 import { ChatService } from './chat.service';
 import { PresenceService } from 'src/presence/presence.service';
 import { JwtService } from '@nestjs/jwt';
-import { UsePipes, ValidationPipe } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, UsePipes, ValidationPipe } from '@nestjs/common';
 import { TypingDto } from './dto/typing.dto';
 
+@Injectable()
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -15,11 +14,11 @@ import { TypingDto } from './dto/typing.dto';
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  public server: Server; //public: to use by other services
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly messageService: MessageService,
+    @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
     private readonly presenceService: PresenceService,
 
@@ -113,26 +112,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       })
 
     }
-  }
-
-
-  @SubscribeMessage('send_message')
-  async handleSendMessage(@ConnectedSocket() client: Socket, @MessageBody() sendMessageDto: SendMessageDto) {
-    const senderId = client.data.user.sub;
-
-    // SAVE to DB 
-    // This is REQURIED ********
-    await this.messageService.sendMessage(senderId, sendMessageDto)
-
-    const message = {
-      ...sendMessageDto,
-      senderId,
-      createdAt: new Date(),
-    }
-
-    // emit to the ROOM(clients/participants will join the Room using chatId)
-    this.server.to(`chat_${sendMessageDto.chatId}`).emit('new_message', message)
-    console.log("NEW MESSAGE: ", message)
   }
 
   @SubscribeMessage('join_chat')

@@ -1,14 +1,21 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
-import { title } from 'process';
 import { AddToChatDto } from './dto/add-to-chat.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
-import { RemoveFromGroupChatDto } from './dto/remove-from-group-chat.dto';
+import { ChatGateway } from './chat.gateway';
+import { NotificationType } from '@prisma/client';
+import { NotificationService } from 'src/notification/notification.service';
+
 
 @Injectable()
 export class ChatService {
-    constructor(private readonly databaseService: DatabaseService) { }
+    constructor(
+        private readonly databaseService: DatabaseService,
+        private readonly chatGatway: ChatGateway,
+        private readonly notificationService: NotificationService,
+
+    ) { }
 
     async getChats(userId: string) {
         return this.databaseService.chat.findMany({
@@ -130,11 +137,22 @@ export class ChatService {
                     take: 1,
                 }
             }
+        });
+
+        await this.notificationService.createNotification(userId, newChat.id, {
+            receiverId: otherUserId,
+            type: NotificationType.NEW_CHAT
         })
+
+        const socketPayload = {
+            type: NotificationType.NEW_CHAT,
+            data: newChat,
+            timestamp: new Date(),
+        }
+        this.chatGatway.server.to(`user_${otherUserId}`).emit("new_chat", socketPayload);
 
         return newChat;
     }
-
 
     async getMyFriendsIds(userId: string) {
         const chats = await this.databaseService.chat.findMany({

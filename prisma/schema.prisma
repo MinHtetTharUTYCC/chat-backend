@@ -23,8 +23,12 @@ model User {
 
   createdAt DateTime @default(now())
 
-  messages     Message[]
-  participants Participant[]
+  messages       Message[]
+  participants   Participant[]
+  pinnedMessages PinnedMessage[]
+
+  notifications Notification[] @relation("ReceiverRelation")
+  actorOfs      Notification[] @relation("ActorRelation")
 }
 
 model Chat {
@@ -34,8 +38,10 @@ model Chat {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  participants Participant[]
-  messages     Message[]
+  participants   Participant[]
+  messages       Message[]
+  pinnedMessages PinnedMessage[]
+  notifications  Notification[]
 }
 
 model Participant {
@@ -59,6 +65,44 @@ model Message {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  chat           Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  pinnedMessages PinnedMessage[]
+}
+
+model PinnedMessage {
+  id             String @id @default(cuid())
+  pinnedByUserId String
+  chatId         String
+  messageId      String
+
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [pinnedByUserId], references: [id], onDelete: Cascade)
+  chat    Chat    @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, messageId])
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  chatId     String
+  receiverId String
+  actorId    String
+  type       NotificationType
+  pinnedId   String?
+  data       Json? //extra meta data(messageId, some preveiw,etc)
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  receiver User @relation(name: "ReceiverRelation", fields: [receiverId], references: [id], onDelete: Cascade)
+  actor    User @relation(name: "ActorRelation", fields: [actorId], references: [id], onDelete: Cascade)
+  chat     Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  NEW_CHAT
+  GROUP_ADDED
+  MESSAGE_PINNED
 }

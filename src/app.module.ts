@@ -10,9 +10,10 @@ import { MessageModule } from './message/message.module';
 import { PresenceModule } from './presence/presence.module';
 import { RedisModule } from './redis/redis.module';
 import { SearchModule } from './search/search.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule, SearchModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule, SearchModule, NotificationModule],
   controllers: [AppController],
   providers: [AppService],
 })
