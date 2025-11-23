@@ -19,12 +19,12 @@ export class ChatController {
     ) { }
 
     @Get()
-    async getChats(@Req() req) {
+    async getAllChats(@Req() req) {
         return this.chatService.getAllChats(req.user.sub)
     }
 
     @Get('/:chatId')
-    async getChat(@Req() req, @Param('chatId') chatId: string) {
+    async viewChat(@Req() req, @Param('chatId') chatId: string) {
         return this.chatService.viewChat(req.user.sub, chatId);
     }
 
@@ -34,15 +34,16 @@ export class ChatController {
     }
 
     @Get("/:chatId/messages")
-    async getMessages(@Param('chatId') chatId: string,
+    async getMessages(
         @Req() req,
+        @Param('chatId') chatId: string,
         @Query(new ValidationPipe({ transform: true })) query: PaginationDto) {
         return this.messageService.getMessages(req.user.sub, chatId, query.cursor, query.limit)
     }
 
     @Post('/:chatId/messages')
     async sendMessage(@Req() req, @Param('chatId') chatId: string, @Body(ValidationPipe) sendMessageDto: SendMessageDto) {
-        return this.messageService.sendMessage(req.user.sub, chatId, sendMessageDto)
+        return this.messageService.sendMessage(req.user.sub, chatId, sendMessageDto.content)
     }
 
     @Delete("/:chatId/messages/:messageId")
@@ -52,14 +53,14 @@ export class ChatController {
 
     @Patch("/:chatId/messages/:messageId")
     async editMessage(@Req() req, @Param('chatId') chatId: string, @Param('messageId') messageId: string, @Body(ValidationPipe) dto: EditMessageDto) {
-        return this.messageService.editMessage(req.user.sub, chatId, messageId, dto)
+        return this.messageService.editMessage(req.user.sub, chatId, messageId, dto.content)
     }
 
     // PINNED MESSAGES
     // get pinned messages
     @Get('/:chatId/pinned')
-    async getPinnedMessages(@Req() req, @Param('chatId') chatId: string, @Param('messageId') messageId: string) {
-        return this.messageService.getPinnedMessage(req.user.sub, chatId, messageId);
+    async getPinnedMessages(@Req() req, @Param('chatId') chatId: string, @Query(ValidationPipe) dto: PaginationDto) {
+        return this.messageService.getPinnedMessages(req.user.sub, chatId, dto.cursor, dto.limit);
     }
 
     //pin message
@@ -75,18 +76,18 @@ export class ChatController {
     }
 
     @Put('/:chatId/update-title')
-    async updateChatTitle(@Param('chatId') chatId: string, @Req() req, @Body(ValidationPipe) dto: UpdateChatTitleDto) {
-        return this.chatService.updateChatTitle(req.user.sub, chatId, dto)
+    async updateChatTitle(@Req() req, @Param('chatId') chatId: string, @Body(ValidationPipe) dto: UpdateChatTitleDto) {
+        return this.chatService.updateChatTitle(req.user.sub, chatId, dto.title)
     }
 
     @Post('/create-group')
     async createGroupChat(@Req() req, @Body(ValidationPipe) dto: CreateGroupChatDto) {
-        return this.chatService.createGroupChat(req.user.sub, dto);
+        return this.chatService.createGroupChat(req.user.sub, dto.title, dto.userIds);
     }
 
     @Post('/:chatId/participants')
-    async addToChat(@Param('chatId') chatId: string, @Req() req, @Body(ValidationPipe) dto: AddToChatDto) {
-        return this.chatService.addToGroupChat(req.user.sub, chatId, dto)
+    async addToGroupChat(@Req() req, @Param('chatId') chatId: string, @Body(ValidationPipe) dto: AddToChatDto) {
+        return this.chatService.addToGroupChat(req.user.sub, chatId, dto.userIds)
     }
 
     // NEED ROLE to do this
@@ -97,12 +98,12 @@ export class ChatController {
     // }
 
     @Post('/:chatId/participants/join-group')
-    async joinGroup(@Param('chatId') chatId: string, @Req() req) {
+    async joinGroup(@Req() req, @Param('chatId') chatId: string) {
         return this.chatService.joinGroup(req.user.sub, chatId)
     }
 
     @Delete('/:chatId/participants/leave-group')
-    async leaveGroup(@Param('chatId') chatId: string, @Req() req) {
+    async leaveGroup(@Req() req, @Param('chatId') chatId: string) {
         return this.chatService.leaveGroup(req.user.sub, chatId)
     }
 }

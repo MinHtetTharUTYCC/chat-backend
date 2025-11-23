@@ -20,13 +20,13 @@ export class MessageService {
         private cacheManager: Cache,
     ) { }
 
-    async sendMessage(userId: string, chatId: string, sendMessageDto: SendMessageDto) {
+    async sendMessage(userId: string, chatId: string, content: string) {
         await this.verifyMembership(userId, chatId);
 
         const result = await this.databaseService.$transaction(async (tx) => {
             const newMessage = await tx.message.create({
                 data: {
-                    ...sendMessageDto,
+                    content,
                     chatId,
                     senderId: userId,
                 },
@@ -159,7 +159,7 @@ export class MessageService {
         }
     }
 
-    async editMessage(userId: string, chatId: string, messageId: string, dto: EditMessageDto) {
+    async editMessage(userId: string, chatId: string, messageId: string, content: string) {
         const message = await this.databaseService.message.findFirst({
             where: {
                 id: messageId,
@@ -188,7 +188,7 @@ export class MessageService {
                 id: messageId,
             },
             data: {
-                content: dto.content,
+                content: content,
             }
         });
 
@@ -207,7 +207,7 @@ export class MessageService {
         return updatedMessage;
     }
 
-    async getPinnedMessage(userId: string, chatId: string, cursor?: string, limit: number = 20) {
+    async getPinnedMessages(userId: string, chatId: string, cursor?: string, limit: number = 20) {
         await this.verifyMembership(userId, chatId);
 
         const cachedKey = `chat:${chatId}:pinned_messages:latest`;

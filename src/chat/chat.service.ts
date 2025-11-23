@@ -354,7 +354,7 @@ export class ChatService {
         return chats.map(chat => chat.id);
     }
 
-    async updateChatTitle(userId: string, chatId: string, dto: UpdateChatTitleDto) {
+    async updateChatTitle(userId: string, chatId: string, newTitle: string) {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId, participants: { some: { userId } } },
             select: {
@@ -368,7 +368,7 @@ export class ChatService {
         if (!chat.isGroup) throw new ForbiddenException("Direct messages cannot have custom titles")
 
         const dataToUpdate = {
-            title: dto.title === '' ? null : dto.title,
+            title: newTitle === '' ? null : newTitle,
         }
 
         await this.databaseService.chat.update({
@@ -379,14 +379,14 @@ export class ChatService {
         return {
             success: true,
             chatId,
-            title: dto.title,
+            newTitle,
         }
     }
 
-    async createGroupChat(userId: string, dto: CreateGroupChatDto) {
+    async createGroupChat(userId: string, title: string, userIds: string[]) {
         // Set: for removing dupblicates
         let uniqueUserIds = new Set<string>([
-            ...dto.userIds,
+            ...userIds,
             userId,
         ])
         const usersToParticipate = Array.from(uniqueUserIds).map(id => ({ userId: id }))
@@ -398,7 +398,7 @@ export class ChatService {
         const groupChat = await this.databaseService.chat.create({
             data: {
                 isGroup: true,
-                title: dto.title || 'New Group',
+                title: title || 'New Group',
                 participants: {
                     create: usersToParticipate,
                 }
@@ -450,7 +450,7 @@ export class ChatService {
         return groupChat;
     }
 
-    async addToGroupChat(userId: string, chatId: string, dto: AddToChatDto) {
+    async addToGroupChat(userId: string, chatId: string, userIds: string[]) {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId },
             select: {
@@ -469,7 +469,7 @@ export class ChatService {
         if (chat.participants.length === 0) throw new ForbiddenException("You are not a member of this chat")
         if (!chat.isGroup) throw new ForbiddenException("You cannot add members to 1-on-1 chat. Create a group instead.")
 
-        const uniqueUserIds = new Set(dto.userIds.filter(id => id !== userId)); //filter me(if exists) and remove duplicates
+        const uniqueUserIds = new Set(userIds.filter(id => id !== userId)); //filter me(if exists) and remove duplicates
         const newUsersToParticipate = Array.from(uniqueUserIds).map((id) => ({ userId: id }));
         const newUsersToNotify = Array.from(uniqueUserIds).map(id => `user_${id}`);
 
@@ -560,7 +560,16 @@ export class ChatService {
             }
         });
 
-        // invalidate chats cache
+        const socketPaylod = {
+            chatId,
+            timestamp: new Date(),
+        }
+
+        // update UI immediately
+        this.chatGatway.server.to(`user_${userId}`).emit("group_joined", socketPaylod);
+
+
+        // VALIDATE chats cache
         await this.cacheManager.del(`user:${userId}:chats`);
 
         return {
@@ -580,6 +589,14 @@ export class ChatService {
                 }
             },
         });
+
+        const socketPaylod = {
+            chatId,
+            timestamp: new Date(),
+        }
+
+        // update UI immediately
+        this.chatGatway.server.to(`user_${userId}`).emit("group_leaved", socketPaylod);
 
         // invalidate chats cache
         await this.cacheManager.del(`user:${userId}:chats`);
