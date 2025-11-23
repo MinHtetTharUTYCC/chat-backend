@@ -1,5 +1,6 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Message, NotificationType } from '@prisma/client';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { ChatGateway } from 'src/chat/chat.gateway';
@@ -15,12 +16,14 @@ export class MessageService {
         private readonly databaseService: DatabaseService,
         private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
+        @Inject(CACHE_MANAGER)
+        private cacheManager: Cache,
     ) { }
 
     async sendMessage(userId: string, chatId: string, sendMessageDto: SendMessageDto) {
         await this.verifyMembership(userId, chatId);
 
-        const message = await this.databaseService.$transaction(async (tx) => {
+        const result = await this.databaseService.$transaction(async (tx) => {
             const newMessage = await tx.message.create({
                 data: {
                     ...sendMessageDto,
@@ -37,23 +40,46 @@ export class MessageService {
                 }
             });
 
-            await tx.chat.update({
+            const updatedChat = await tx.chat.update({
                 where: { id: chatId },
-                data: { lastMessageAt: new Date() }
+                data: { lastMessageAt: new Date() },
+                include: {
+                    participants: {
+                        select: {
+                            userId: true,
+                        }
+                    }
+                }
             });
 
-            return newMessage;
+            return { newMessage, updatedChat };
         })
 
         // Broadcast via WS
-        this.chatGateway.server.to(`chat_${chatId}`).emit('new_message', message)
+        this.chatGateway.server.to(`chat_${chatId}`).emit('new_message', result.newMessage);
 
-        return message;
+        // INVALIDATE Cache
+        //del chats
+        const promises = result.updatedChat.participants.map(parti => this.cacheManager.del(`user:${parti.userId}:chats`));
+        await Promise.all(promises);
+
+        await this.cacheManager.del(`chat:${chatId}:latest`)
+
+        return result.newMessage;
     }
 
     async getMessages(userId: string, chatId: string, cursor?: string, limit: number = 20) {
         await this.verifyMembership(userId, chatId);
 
+        const latestMessageKey = `chat:${chatId}:latest`;
+
+        if (!cursor) {
+            const cachedResult = await this.cacheManager.get(latestMessageKey);
+            if (cachedResult) {
+                console.log("Returning messages + meta from cache...")
+                return cachedResult;
+            }
+        }
 
         const messages = await this.databaseService.message.findMany({
             where: { chatId },
@@ -69,23 +95,41 @@ export class MessageService {
         });
 
         let nextCursor: string | null = null;
-        // if .lentth is fewer than limit, it reached the end
-        if (messages.length === limit) {
+        // if .length is fewer than limit, it reached the end
+        if (messages.length === limit && messages.length > 0) {
             nextCursor = messages[messages.length - 1].id;
         }
 
-        return {
+        const response = {
             data: messages,
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
             }
         }
+
+        if (!cursor) {
+            await this.cacheManager.set(latestMessageKey, response, 300 * 1000);//5 minute
+        }
+
+        return response;
     }
 
-
     async deleteMessage(userId: string, chatId: string, messageId: string) {
-        await this.verifyMembership(userId, chatId);
+        // await this.verifyMembership(userId, chatId); //no-need(reduce db calls) anymore cuz, we need others participants(see DB call below)
+
+        const participants = await this.databaseService.participant.findMany({
+            where: { chatId },
+            select: {
+                userId: true
+            }
+        });
+
+
+        const usersToValidate = participants.map(parti => parti.userId);
+        if (!usersToValidate.includes(userId)) {
+            throw new ForbiddenException("You are not a member of this chat")
+        }
 
         const result = await this.databaseService.message.deleteMany({
             where: {
@@ -95,7 +139,19 @@ export class MessageService {
             }
         });
 
-        if (result.count === 0) throw new NotFoundException("Message not found or you are not the sender")
+        if (result.count === 0) throw new NotFoundException("Message not found or you are not the sender");
+
+        // update UI immediately
+        this.chatGateway.server.to(`chat_${chatId}`).emit('message_deleted', { messageId });
+
+        // INVALIDATE Cache
+        //1: to chat messages
+        await this.cacheManager.del(`chat:${chatId}:latest`);
+        //2: to all participants's chats list
+        // seems aggressive: but unsending is rare: so minimun DB call
+        // (instead of checking if message is last message and delete:_can introdude bugs)
+        const promises = usersToValidate.map((usrId) => this.cacheManager.del(`user:${usrId}:chats`));
+        await Promise.all(promises);
 
         return {
             success: true,
@@ -109,10 +165,23 @@ export class MessageService {
                 id: messageId,
                 senderId: userId,
                 chatId: chatId,
+            },
+            include: {
+                chat: {
+                    include: {
+                        participants: {
+                            select: { userId: true }
+                        }
+                    }
+                }
             }
         })
+        if (!message) throw new NotFoundException("Message not found or you are not the sender");
 
-        if (!message) throw new NotFoundException("Message not found or you are not the sender")
+        const usersToValidate = message.chat.participants.map(parti => parti.userId);
+        if (!usersToValidate.includes(userId)) {
+            throw new ForbiddenException("You are not a member of this chat")
+        }
 
         const updatedMessage = await this.databaseService.message.update({
             where: {
@@ -121,13 +190,35 @@ export class MessageService {
             data: {
                 content: dto.content,
             }
-        })
+        });
+
+        // update UI immediately
+        this.chatGateway.server.to(`chat_${chatId}`).emit('message_updated', { messageId });
+
+        // VALIDATE Cache 
+        //1: to chat messages
+        await this.cacheManager.del(`chat:${chatId}:latest`);
+        //2: to all participants's chats list
+        // seems aggressive: but unsending is rare: so minimun DB call
+        // (instead of checking if message is last message and delete:_can introdude bugs)
+        const promises = usersToValidate.map((usrId) => this.cacheManager.del(`user:${usrId}:chats`));
+        await Promise.all(promises);
 
         return updatedMessage;
     }
 
     async getPinnedMessage(userId: string, chatId: string, cursor?: string, limit: number = 20) {
         await this.verifyMembership(userId, chatId);
+
+        const cachedKey = `chat:${chatId}:pinned_messages:latest`;
+
+        if (!cursor) {
+            const cachedResult = await this.cacheManager.get(cachedKey);
+            if (cachedResult) {
+                console.log("Returning pinned messages from cache...");
+                return cachedResult;
+            }
+        }
 
         const pinnedMessages = await this.databaseService.pinnedMessage.findMany({
             where: {
@@ -155,6 +246,10 @@ export class MessageService {
             }
         });
 
+        if (!cursor) {
+            await this.cacheManager.set(cachedKey, pinnedMessages, 1800 * 1000);//30 minutes
+        }
+
         let nextCursor: string | null = null
         if (pinnedMessages.length === limit) {
             nextCursor = pinnedMessages[pinnedMessages.length - 1].id;
@@ -166,7 +261,6 @@ export class MessageService {
                 nextCursor,
                 hasMore: nextCursor !== null,
             }
-
         };
 
     }
@@ -235,8 +329,8 @@ export class MessageService {
             if (pinMessage.chat.isGroup) {
                 // Broadcast "State Update" to EVERYONE (Silent update)
                 // This ensures everyone sees the message get pinned in the UI immediately
-                this.chatGateway.server.to(`chat_${chatId}`).emit('pin_updated', socketPayload);
-                console.log("EMitted pin_updated")
+                this.chatGateway.server.to(`chat_${chatId}`).emit('pin_added', socketPayload);
+                console.log("EMitted pin_added")
 
                 if (message.senderId !== userId) {
                     //For Noti popup
@@ -267,7 +361,7 @@ export class MessageService {
 
                 if (otherParticipant) {
                     // update pin UI immediately
-                    this.chatGateway.server.to(`user_${otherParticipant.userId}`).emit('pin_updated', socketPayload);
+                    this.chatGateway.server.to(`chat_${chatId}`).emit('pin_added', socketPayload);
                     //For Noti popup
                     this.chatGateway.server.to(`user_${otherParticipant.userId}`).emit('notification_new', socketPayload);
 
@@ -282,8 +376,15 @@ export class MessageService {
                         }
                     );
                 }
-
             }
+
+            // INVALIDATE Cache
+            const keysToDelete = [
+                `chat:${chatId}:latest`,
+                `chat:${chatId}:pinned_messages:latest`, // i have pinned message (api end point)
+            ]
+            await this.cacheManager.del(keysToDelete[0]);
+            await this.cacheManager.del(keysToDelete[1]);
 
             return pinMessage;
 
@@ -297,7 +398,6 @@ export class MessageService {
         }
     }
 
-    //only 
     async unpinMessage(userId: string, chatId: string, messageId: string) {
         await this.verifyMembership(userId, chatId);
 
@@ -327,6 +427,8 @@ export class MessageService {
                 id: pinnedRecord.id,
             }
         });
+
+        this.chatGateway.server.to(`chat_${chatId}`).emit('pin_removed', { messageId });
 
         return {
             success: true,

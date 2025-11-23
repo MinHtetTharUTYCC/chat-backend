@@ -36,6 +36,7 @@ export class NotificationService {
         return notification;
     }
 
+
     async getNotifications(userId: string, cursor?: string, limit: number = 20) {
         const notifications = await this.databaseService.notification.findMany({
             where: {

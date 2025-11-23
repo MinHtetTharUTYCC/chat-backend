@@ -1,3 +1,121 @@
+**Project Description**
+
+- **Overview:**: A real-time chat backend built with NestJS and TypeScript. It provides authentication (JWT access + refresh tokens), presence tracking, WebSocket-based real-time messaging (Socket.IO-compatible gateway), and persistence via Prisma. The project is organized into feature modules such as `auth`, `users`, `chat`, `message`, and `notification`.
+
+**Tech Stack**
+
+- **Framework**: NestJS (modular, decorators-based server)
+- **Language**: TypeScript
+- **Database / ORM**: Prisma (schema in `prisma/schema.prisma`) — typically used with PostgreSQL or MySQL via `DATABASE_URL`.
+- **Auth**: JWT (access + refresh tokens) using `@nestjs/jwt` and Passport strategies
+- **Real-time**: WebSocket gateway implemented with NestJS Gateway + `socket.io` types (server-side `socket.io` usage in `src/chat/chat.gateway.ts`).
+- **Cache / Presence**: Redis (optional) — presence and caching helpers are present in `src/redis` and `src/presence`.
+- **Other libs**: `bcrypt` for password hashing, `cookie-parser` for cookie handling, `class-validator` / `class-transformer` for DTO validation.
+
+**Getting Started**
+
+- **Prerequisites**:
+  - Node.js (v18+ recommended)
+  - npm (or yarn/pnpm)
+  - A running relational database (Postgres / MySQL) and a configured `DATABASE_URL` for Prisma
+  - (Optional) Redis instance for presence/caching if you plan to enable those features
+
+- **Environment**:
+  - Create a `.env` file in the project root containing at minimum:
+    - `DATABASE_URL` (Prisma)
+    - `JWT_ACCESS_SECRET` (string)
+    - `JWT_REFRESH_SECRET` (string)
+    - `PORT` (optional)
+    - `REDIS_URL` (optional)
+
+- **Install Dependencies**:
+
+```powershell
+cd /path/to/chat-backend
+npm install
+```
+
+- **Prisma setup / Migrations**:
+
+```powershell
+# generate prisma client
+npx prisma generate
+
+# Run migrations in development (creates and applies a migration)
+npx prisma migrate dev
+
+# Or deploy migrations in production
+npx prisma migrate deploy
+```
+
+- **Run the app**:
+
+```powershell
+# development (watch)
+npm run start:dev
+
+# production
+npm run build
+npm run start:prod
+```
+
+**Environment examples**
+
+Create a `.env` with (example values):
+
+```
+DATABASE_URL="postgresql://user:pass@localhost:5432/chatdb"
+JWT_ACCESS_SECRET="your_access_secret_here"
+JWT_REFRESH_SECRET="your_refresh_secret_here"
+PORT=7000
+REDIS_URL="redis://localhost:6379"
+```
+
+**API Endpoints**
+
+- **Authentication** (`src/auth/auth.controller.ts`)
+  - `POST /auth/register` : Register a new user. Request body: registration DTO (email, password, ...). Returns `accessToken` and sets an HTTP-only `refresh_token` cookie.
+  - `POST /auth/login` : Login with credentials. Request body: login DTO (email, password). Returns `accessToken` and sets `refresh_token` cookie.
+  - `POST /auth/refresh` : Exchange refresh cookie for a new access token. Uses a guard that reads the `refresh_token` cookie. Returns a fresh `accessToken` and rotates the refresh cookie.
+  - `POST /auth/logout` : Invalidates refresh token server-side and clears the `refresh_token` cookie. Requires a valid access token.
+
+- **WebSocket (Real-time)** (`src/chat/chat.gateway.ts`)
+  - Connect: When initializing a socket connection, pass the JWT access token in the `auth` handshake payload, for example:
+
+```js
+// client-side socket.io connect example
+const socket = io(SERVER_URL, { auth: { token: ACCESS_TOKEN } });
+```
+
+  - Events emitted by server:
+    - `presence_update` : informs relevant friend rooms of user online/offline changes
+    - `user_typing` : volatile typing indicator forwarded to a chat room
+
+  - Client -> Server events handled:
+    - `join_chat` (payload: `chatId`) — join a chat room
+    - `typing` (payload: `{ chatId, isTyping }`) — forwarded as `user_typing` to the room
+
+- **Other REST modules**
+  - The repo contains additional controllers and modules for `users`, `chat`, `message`, and `notification` (look under `src/`). Inspect those controllers for full REST API details and request/response DTOs.
+
+**Notes & Security**
+
+- Access tokens are short-lived and returned in responses (`accessToken`). Refresh tokens are stored in a secure, httpOnly cookie scoped to `/auth/refresh` and rotated on refresh.
+- Make sure to set strong `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values in production and to run over HTTPS so cookies set with `secure: true` are usable.
+
+**Troubleshooting**
+
+- If strategies complain about missing config during app bootstrap, ensure `ConfigModule` (or a `.env` loader) is initialized early and that `ConfigService` is available to providers that need environment values.
+- Prisma errors: ensure `DATABASE_URL` is valid and migrations have been applied.
+
+**Development Tips**
+
+- Use `npm run start:dev` for automatic reloads during development.
+- Use Postman / HTTP client for auth endpoints, and a Socket.IO client (or your frontend) for realtime testing.
+
+**License**
+
+- This project is licensed under the MIT License. See `LICENSE` for details.
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>

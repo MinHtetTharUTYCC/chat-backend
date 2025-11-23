@@ -20,7 +20,12 @@ export class ChatController {
 
     @Get()
     async getChats(@Req() req) {
-        return this.chatService.getChats(req.user.sub)
+        return this.chatService.getAllChats(req.user.sub)
+    }
+
+    @Get('/:chatId')
+    async getChat(@Req() req, @Param('chatId') chatId: string) {
+        return this.chatService.viewChat(req.user.sub, chatId);
     }
 
     @Post('/start')
@@ -78,13 +83,6 @@ export class ChatController {
     async createGroupChat(@Req() req, @Body(ValidationPipe) dto: CreateGroupChatDto) {
         return this.chatService.createGroupChat(req.user.sub, dto);
     }
-
-
-    @Get('/:chatId')
-    async getChatInfo(@Param('chatId') chatId: string,) {
-        return this.chatService.getChatInfo(chatId);
-    }
-
 
     @Post('/:chatId/participants')
     async addToChat(@Param('chatId') chatId: string, @Req() req, @Body(ValidationPipe) dto: AddToChatDto) {
