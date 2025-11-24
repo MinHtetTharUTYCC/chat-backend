@@ -1,8 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
-import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
-import { AddToChatDto } from './dto/add-to-chat.dto';
-import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { ChatGateway } from './chat.gateway';
 import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
@@ -46,8 +43,6 @@ export class ChatService {
 
     async getAllChats(userId: string) {
         const cacheKey = `user:${userId}:chats`;
-
-        await this.cacheManager.del('test_key');
 
         //check redis
         const cachedData = await this.cacheManager.get(cacheKey);
@@ -197,7 +192,6 @@ export class ChatService {
         await this.cacheManager.set(cachedKey, chat, 300 * 1000); //5 minutes
 
         return chat;
-
     }
 
     async startChat(userId: string, otherUserId: string) {
@@ -214,11 +208,6 @@ export class ChatService {
         //check if chat exists already
         const existingChat = await this.databaseService.chat.findFirst({
             where: {
-                // participants: {
-                //     every: {
-                //         userId: { in: [userId, otherUserId] }
-                //     }
-                // }
                 participants: {
                     some: { userId }
                 },
