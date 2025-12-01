@@ -1,0 +1,909 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "UsersController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_updateUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{viewUserId}": {
+      "get": {
+        "operationId": "UsersController_viewUser",
+        "parameters": [
+          {
+            "name": "viewUserId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/chats": {
+      "get": {
+        "operationId": "ChatController_getAllChats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/my-chats-ids": {
+      "get": {
+        "operationId": "ChatController_getMyChatsIds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/start": {
+      "post": {
+        "operationId": "ChatController_startChat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/messages": {
+      "get": {
+        "operationId": "ChatController_getMessages",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor for pagination (optional)",
+            "schema": {
+              "example": "cursor-string",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      },
+      "post": {
+        "operationId": "ChatController_sendMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}": {
+      "get": {
+        "operationId": "ChatController_viewChat",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "delete": {
+        "operationId": "ChatController_deleteMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      },
+      "patch": {
+        "operationId": "ChatController_editMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/pinned": {
+      "get": {
+        "operationId": "ChatController_getPinnedMessages",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor for pagination (optional)",
+            "schema": {
+              "example": "cursor-string",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/messages/{messageId}/pin": {
+      "post": {
+        "operationId": "ChatController_pinMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      },
+      "delete": {
+        "operationId": "ChatController_unpinMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/update-title": {
+      "put": {
+        "operationId": "ChatController_updateChatTitle",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChatTitleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/create-group": {
+      "post": {
+        "operationId": "ChatController_createGroupChat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/participants": {
+      "post": {
+        "operationId": "ChatController_addToGroupChat",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddToChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/participants/join-group": {
+      "post": {
+        "operationId": "ChatController_joinGroup",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/participants/leave-group": {
+      "delete": {
+        "operationId": "ChatController_leaveGroup",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationController_getNotifications",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor for pagination (optional)",
+            "schema": {
+              "example": "cursor-string",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notification"
+        ]
+      }
+    },
+    "/presence/friends": {
+      "get": {
+        "operationId": "PresenceController_getOnlineFriends",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Presence"
+        ]
+      }
+    },
+    "/presence/bulk": {
+      "post": {
+        "operationId": "PresenceController_getBulkPresence",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Presence"
+        ]
+      }
+    },
+    "/presence/{userId}": {
+      "get": {
+        "operationId": "PresenceController_getPresence",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Presence"
+        ]
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "SearchController_searchGlobal",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Search"
+        ]
+      }
+    },
+    "/search/chats/{chatId}": {
+      "get": {
+        "operationId": "SearchController_searchInMessages",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Search"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Chat Backend API",
+    "description": "API for chat application backend",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "jwt"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address of the user",
+            "example": "john.doe@example.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "The password (minimum 6 characters)",
+            "example": "strongpassword123",
+            "minLength": 6
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Uername of the user",
+            "example": "user111"
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the user",
+            "example": "john.doe@example.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "The password (minimum 6 characters)",
+            "example": "strongpassword123",
+            "minLength": 6
+          }
+        },
+        "required": [
+          "username",
+          "email",
+          "password"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "StartChatDto": {
+        "type": "object",
+        "properties": {
+          "otherUserId": {
+            "type": "string",
+            "description": "User ID of the person to start a chat with",
+            "example": "user-id-123"
+          }
+        },
+        "required": [
+          "otherUserId"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Content of the message to send",
+            "example": "Hello, how are you?"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "EditMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "New content for the message",
+            "example": "This is the updated message content"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "UpdateChatTitleDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "New title for the chat",
+            "maxLength": 30,
+            "example": "Updated Group Chat Title"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CreateGroupChatDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the group chat",
+            "maxLength": 30,
+            "example": "My Group Chat"
+          },
+          "userIds": {
+            "description": "Array of user IDs to include in the group chat",
+            "example": [
+              "user-id-1",
+              "user-id-2",
+              "user-id-3"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "userIds"
+        ]
+      },
+      "AddToChatDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "description": "Array of user IDs to add to the chat",
+            "example": [
+              "user-id-1",
+              "user-id-2"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userIds"
+        ]
+      }
+    }
+  }
+}

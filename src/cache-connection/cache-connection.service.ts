@@ -6,7 +6,9 @@ import type { Cache } from 'cache-manager';
 export class CacheConnectionService implements OnModuleInit {
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) { }
 
-    onModuleInit() {
+    async onModuleInit() {
+
+        //OLD Version-5.7.6 works wiith (nest/cache-manager 2.3.0) BUT i need newer version
         const cache = this.cacheManager as any;
 
         const redisClient = cache.store?.client ?? cache.stores[0]?.client ?? cache.client;
@@ -17,7 +19,7 @@ export class CacheConnectionService implements OnModuleInit {
             console.error('❌ REDIS CLIENT NOT FOUND. Printing Cache Object For MORE DETAILS:');
             console.log(Object.keys(cache));
         }
-
-
     }
 }
+
+

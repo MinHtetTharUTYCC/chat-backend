@@ -1,5 +1,11 @@
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    ConflictException,
+    ForbiddenException,
+    Inject,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
@@ -18,7 +24,7 @@ export class MessageService {
         private readonly notificationService: NotificationService,
         @Inject(CACHE_MANAGER)
         private cacheManager: Cache,
-    ) { }
+    ) {}
 
     async sendMessage(userId: string, chatId: string, content: string) {
         await this.verifyMembership(userId, chatId);
@@ -35,9 +41,9 @@ export class MessageService {
                         select: {
                             id: true,
                             username: true,
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             });
 
             const updatedChat = await tx.chat.update({
@@ -47,36 +53,45 @@ export class MessageService {
                     participants: {
                         select: {
                             userId: true,
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             });
 
             return { newMessage, updatedChat };
-        })
+        });
 
         // Broadcast via WS
-        this.chatGateway.server.to(`chat_${chatId}`).emit('new_message', result.newMessage);
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('new_message', result.newMessage);
 
         // INVALIDATE Cache
         //del chats
-        const promises = result.updatedChat.participants.map(parti => this.cacheManager.del(`user:${parti.userId}:chats`));
+        const promises = result.updatedChat.participants.map((parti) =>
+            this.cacheManager.del(`user:${parti.userId}:chats`),
+        );
         await Promise.all(promises);
 
-        await this.cacheManager.del(`chat:${chatId}:latest`)
+        await this.cacheManager.del(`chat:${chatId}:messages`);
 
         return result.newMessage;
     }
 
-    async getMessages(userId: string, chatId: string, cursor?: string, limit: number = 20) {
+    async getMessages(
+        userId: string,
+        chatId: string,
+        cursor?: string,
+        limit: number = 20,
+    ) {
         await this.verifyMembership(userId, chatId);
 
-        const latestMessageKey = `chat:${chatId}:latest`;
+        const latestMessageKey = `chat:${chatId}:messages`;
 
         if (!cursor) {
             const cachedResult = await this.cacheManager.get(latestMessageKey);
             if (cachedResult) {
-                console.log("Returning messages + meta from cache...")
+                console.log('Returning messages + meta from cache...');
                 return cachedResult;
             }
         }
@@ -89,9 +104,9 @@ export class MessageService {
             orderBy: { createdAt: 'desc' },
             include: {
                 sender: {
-                    select: { id: true, username: true }
-                }
-            }
+                    select: { id: true, username: true },
+                },
+            },
         });
 
         let nextCursor: string | null = null;
@@ -101,15 +116,15 @@ export class MessageService {
         }
 
         const response = {
-            data: messages,
+            messages,
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
-            }
-        }
+            },
+        };
 
         if (!cursor) {
-            await this.cacheManager.set(latestMessageKey, response, 300 * 1000);//5 minute
+            await this.cacheManager.set(latestMessageKey, response, 300 * 1000); //5 minute
         }
 
         return response;
@@ -121,14 +136,13 @@ export class MessageService {
         const participants = await this.databaseService.participant.findMany({
             where: { chatId },
             select: {
-                userId: true
-            }
+                userId: true,
+            },
         });
 
-
-        const usersToValidate = participants.map(parti => parti.userId);
+        const usersToValidate = participants.map((parti) => parti.userId);
         if (!usersToValidate.includes(userId)) {
-            throw new ForbiddenException("You are not a member of this chat")
+            throw new ForbiddenException('You are not a member of this chat');
         }
 
         const result = await this.databaseService.message.deleteMany({
@@ -136,30 +150,42 @@ export class MessageService {
                 id: messageId,
                 senderId: userId,
                 chatId,
-            }
+            },
         });
 
-        if (result.count === 0) throw new NotFoundException("Message not found or you are not the sender");
+        if (result.count === 0)
+            throw new NotFoundException(
+                'Message not found or you are not the sender',
+            );
 
         // update UI immediately
-        this.chatGateway.server.to(`chat_${chatId}`).emit('message_deleted', { messageId });
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('message_deleted', { messageId });
 
         // INVALIDATE Cache
         //1: to chat messages
-        await this.cacheManager.del(`chat:${chatId}:latest`);
+        await this.cacheManager.del(`chat:${chatId}:messages`);
         //2: to all participants's chats list
         // seems aggressive: but unsending is rare: so minimun DB call
         // (instead of checking if message is last message and delete:_can introdude bugs)
-        const promises = usersToValidate.map((usrId) => this.cacheManager.del(`user:${usrId}:chats`));
+        const promises = usersToValidate.map((usrId) =>
+            this.cacheManager.del(`user:${usrId}:chats`),
+        );
         await Promise.all(promises);
 
         return {
             success: true,
-            message: "Successfully deleted the message"
-        }
+            message: 'Successfully deleted the message',
+        };
     }
 
-    async editMessage(userId: string, chatId: string, messageId: string, content: string) {
+    async editMessage(
+        userId: string,
+        chatId: string,
+        messageId: string,
+        content: string,
+    ) {
         const message = await this.databaseService.message.findFirst({
             where: {
                 id: messageId,
@@ -170,17 +196,22 @@ export class MessageService {
                 chat: {
                     include: {
                         participants: {
-                            select: { userId: true }
-                        }
-                    }
-                }
-            }
-        })
-        if (!message) throw new NotFoundException("Message not found or you are not the sender");
+                            select: { userId: true },
+                        },
+                    },
+                },
+            },
+        });
+        if (!message)
+            throw new NotFoundException(
+                'Message not found or you are not the sender',
+            );
 
-        const usersToValidate = message.chat.participants.map(parti => parti.userId);
+        const usersToValidate = message.chat.participants.map(
+            (parti) => parti.userId,
+        );
         if (!usersToValidate.includes(userId)) {
-            throw new ForbiddenException("You are not a member of this chat")
+            throw new ForbiddenException('You are not a member of this chat');
         }
 
         const updatedMessage = await this.databaseService.message.update({
@@ -189,25 +220,34 @@ export class MessageService {
             },
             data: {
                 content: content,
-            }
+            },
         });
 
         // update UI immediately
-        this.chatGateway.server.to(`chat_${chatId}`).emit('message_updated', { messageId });
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('message_updated', { messageId });
 
-        // VALIDATE Cache 
+        // VALIDATE Cache
         //1: to chat messages
-        await this.cacheManager.del(`chat:${chatId}:latest`);
+        await this.cacheManager.del(`chat:${chatId}:messages`);
         //2: to all participants's chats list
         // seems aggressive: but unsending is rare: so minimun DB call
         // (instead of checking if message is last message and delete:_can introdude bugs)
-        const promises = usersToValidate.map((usrId) => this.cacheManager.del(`user:${usrId}:chats`));
+        const promises = usersToValidate.map((usrId) =>
+            this.cacheManager.del(`user:${usrId}:chats`),
+        );
         await Promise.all(promises);
 
         return updatedMessage;
     }
 
-    async getPinnedMessages(userId: string, chatId: string, cursor?: string, limit: number = 20) {
+    async getPinnedMessages(
+        userId: string,
+        chatId: string,
+        cursor?: string,
+        limit: number = 20,
+    ) {
         await this.verifyMembership(userId, chatId);
 
         const cachedKey = `chat:${chatId}:pinned_messages:latest`;
@@ -215,42 +255,43 @@ export class MessageService {
         if (!cursor) {
             const cachedResult = await this.cacheManager.get(cachedKey);
             if (cachedResult) {
-                console.log("Returning pinned messages from cache...");
+                console.log('Returning pinned messages from cache...');
                 return cachedResult;
             }
         }
 
-        const pinnedMessages = await this.databaseService.pinnedMessage.findMany({
-            where: {
-                chatId,
-            },
-            skip: cursor ? 1 : 0,
-            cursor: cursor ? { id: cursor } : undefined,
-            take: limit,
-            orderBy: {
-                createdAt: 'desc',
-            },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        username: true,
-                    }
+        const pinnedMessages =
+            await this.databaseService.pinnedMessage.findMany({
+                where: {
+                    chatId,
                 },
-                message: {
-                    select: {
-                        id: true,
-                        content: true,
-                    }
-                }
-            }
-        });
+                skip: cursor ? 1 : 0,
+                cursor: cursor ? { id: cursor } : undefined,
+                take: limit,
+                orderBy: {
+                    createdAt: 'desc',
+                },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            username: true,
+                        },
+                    },
+                    message: {
+                        select: {
+                            id: true,
+                            content: true,
+                        },
+                    },
+                },
+            });
 
         if (!cursor) {
-            await this.cacheManager.set(cachedKey, pinnedMessages, 1800 * 1000);//30 minutes
+            await this.cacheManager.set(cachedKey, pinnedMessages, 1800 * 1000); //30 minutes
         }
 
-        let nextCursor: string | null = null
+        let nextCursor: string | null = null;
         if (pinnedMessages.length === limit) {
             nextCursor = pinnedMessages[pinnedMessages.length - 1].id;
         }
@@ -260,9 +301,8 @@ export class MessageService {
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
-            }
+            },
         };
-
     }
 
     async pinMessage(userId: string, chatId: string, messageId: string) {
@@ -278,10 +318,11 @@ export class MessageService {
             select: {
                 id: true,
                 senderId: true,
-            }
+            },
         });
 
-        if (!message) throw new NotFoundException("Message not found in the chat");
+        if (!message)
+            throw new NotFoundException('Message not found in the chat');
 
         try {
             const pinMessage = await this.databaseService.pinnedMessage.create({
@@ -295,7 +336,7 @@ export class MessageService {
                         select: {
                             id: true,
                             username: true,
-                        }
+                        },
                     },
                     message: {
                         include: {
@@ -303,16 +344,16 @@ export class MessageService {
                                 select: {
                                     id: true,
                                     username: true,
-                                }
+                                },
                             },
-                        }
+                        },
                     },
                     chat: {
                         select: {
                             isGroup: true,
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             });
 
             //Noti DB
@@ -323,19 +364,23 @@ export class MessageService {
                 type: NotificationType.MESSAGE_PINNED,
                 data: pinMessage,
                 timestamp: new Date(),
-            }
+            };
 
             // case 1: group-chat
             if (pinMessage.chat.isGroup) {
                 // Broadcast "State Update" to EVERYONE (Silent update)
                 // This ensures everyone sees the message get pinned in the UI immediately
-                this.chatGateway.server.to(`chat_${chatId}`).emit('pin_added', socketPayload);
-                console.log("EMitted pin_added")
+                this.chatGateway.server
+                    .to(`chat_${chatId}`)
+                    .emit('pin_added', socketPayload);
+                console.log('EMitted pin_added');
 
                 if (message.senderId !== userId) {
                     //For Noti popup
-                    this.chatGateway.server.to(`chat_${chatId}`).emit('notification_new', socketPayload);
-                    console.log("EMitted notification_new")
+                    this.chatGateway.server
+                        .to(`chat_${chatId}`)
+                        .emit('notification_new', socketPayload);
+                    console.log('EMitted notification_new');
 
                     // Save noti DB
                     await this.notificationService.createNotification(
@@ -345,25 +390,29 @@ export class MessageService {
                             receiverId: message.senderId,
                             type: NotificationType.MESSAGE_PINNED,
                             pinnedId: pinMessage.id,
-                        }
+                        },
                     );
-
-
                 }
-            } else {  //case 2: 1-to-1 chat
-                const otherParticipant = await this.databaseService.participant.findFirst({
-                    where: {
-                        chatId,
-                        userId: { not: userId }
-                    },
-                    select: { userId: true }
-                })
+            } else {
+                //case 2: 1-to-1 chat
+                const otherParticipant =
+                    await this.databaseService.participant.findFirst({
+                        where: {
+                            chatId,
+                            userId: { not: userId },
+                        },
+                        select: { userId: true },
+                    });
 
                 if (otherParticipant) {
                     // update pin UI immediately
-                    this.chatGateway.server.to(`chat_${chatId}`).emit('pin_added', socketPayload);
+                    this.chatGateway.server
+                        .to(`chat_${chatId}`)
+                        .emit('pin_added', socketPayload);
                     //For Noti popup
-                    this.chatGateway.server.to(`user_${otherParticipant.userId}`).emit('notification_new', socketPayload);
+                    this.chatGateway.server
+                        .to(`user_${otherParticipant.userId}`)
+                        .emit('notification_new', socketPayload);
 
                     // Save noti DB
                     await this.notificationService.createNotification(
@@ -373,25 +422,24 @@ export class MessageService {
                             receiverId: otherParticipant.userId,
                             type: NotificationType.MESSAGE_PINNED,
                             pinnedId: pinMessage.id,
-                        }
+                        },
                     );
                 }
             }
 
             // INVALIDATE Cache
             const keysToDelete = [
-                `chat:${chatId}:latest`,
+                `chat:${chatId}:messages`,
                 `chat:${chatId}:pinned_messages:latest`, // i have pinned message (api end point)
-            ]
+            ];
             await this.cacheManager.del(keysToDelete[0]);
             await this.cacheManager.del(keysToDelete[1]);
 
             return pinMessage;
-
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
-                    throw new ConflictException("Message is already pinned")
+                    throw new ConflictException('Message is already pinned');
                 }
             }
             throw error;
@@ -402,38 +450,46 @@ export class MessageService {
         await this.verifyMembership(userId, chatId);
 
         //find pinnedMessage
-        const pinnedRecord = await this.databaseService.pinnedMessage.findFirst({
-            where: {
-                chatId,
-                messageId,
+        const pinnedRecord = await this.databaseService.pinnedMessage.findFirst(
+            {
+                where: {
+                    chatId,
+                    messageId,
+                },
+                include: {
+                    message: {
+                        select: { senderId: true },
+                    },
+                },
             },
-            include: {
-                message: {
-                    select: { senderId: true }
-                }
-            }
-        });
+        );
 
-        if (!pinnedRecord) throw new NotFoundException("This message is not pinned");
+        if (!pinnedRecord)
+            throw new NotFoundException('This message is not pinned');
 
         //permissions (allow only to pin-creator or message-owner)
         const isPinCreator = pinnedRecord.pinnedByUserId === userId;
         const isMessageOwner = pinnedRecord.message.senderId === userId;
 
-        if (!isPinCreator && !isMessageOwner) throw new ForbiddenException("You can only upin your own pins or your own messages")
+        if (!isPinCreator && !isMessageOwner)
+            throw new ForbiddenException(
+                'You can only upin your own pins or your own messages',
+            );
 
         await this.databaseService.pinnedMessage.delete({
             where: {
                 id: pinnedRecord.id,
-            }
+            },
         });
 
-        this.chatGateway.server.to(`chat_${chatId}`).emit('pin_removed', { messageId });
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('pin_removed', { messageId });
 
         return {
             success: true,
-            message: 'Successfully unpineed message'
-        }
+            message: 'Successfully unpineed message',
+        };
     }
 
     // many functions use this
@@ -442,12 +498,15 @@ export class MessageService {
             where: {
                 userId_chatId: {
                     userId,
-                    chatId
-                }
+                    chatId,
+                },
             },
-            select: { id: true }
+            select: { id: true },
         });
 
-        if (!membership) throw new ForbiddenException("You are not a participant of this chat");
+        if (!membership)
+            throw new ForbiddenException(
+                'You are not a participant of this chat',
+            );
     }
 }

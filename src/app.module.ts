@@ -22,16 +22,24 @@ import { redisStore } from 'cache-manager-redis-yet';
       isGlobal: true,
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        store: await redisStore({
-          socket: {
-            host: configService.get<string>("REDIS_HOST") || '127.0.0.1',//'localhost' also works
-            port: configService.get<number>("REDIS_PORT") || 6379,
-          },
-          ttl: 60000,  //globally 1 minutes
-        }),
-        ttl: 60000, //globally 1 minute
-      })
+      useFactory: async (configService: ConfigService) => {
+        const host = configService.get<string>("REDIS_HOST") || '127.0.0.1'; //'localhost' also works
+        const port = configService.get<number>("REDIS_PORT") || 6379;
+
+        console.log(`🔌 Attempting Redis Connection to: ${host}:${port}`);
+
+        return {
+          store: await redisStore({
+            socket: {
+              host: host,
+              port: port,
+            },
+            ttl: 60000,  //globally 1 minutes
+          })
+        }
+
+      }
+
     }),
     AuthModule, UsersModule, DatabaseModule, ChatModule, MessageModule, PresenceModule, RedisModule, SearchModule, NotificationModule, CacheConnectionModule],
   controllers: [AppController],

@@ -127,7 +127,7 @@ export class ChatService {
     }
 
     async getChat(chatId: string) {
-        const cachedKey = `chat:${chatId}:latest`;
+        const cachedKey = `chat:${chatId}`;
         const cachedResult = await this.cacheManager.get(cachedKey);
         if (cachedResult) {
             console.log("Returing latest chat from cache...");
@@ -163,27 +163,6 @@ export class ChatService {
                         createdAt: 'desc',
                     }
                 },
-                pinnedMessages: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                            }
-                        },
-                        message: {
-                            select: {
-                                id: true,
-                                content: true,
-                            }
-
-                        }
-                    },
-                    take: 5,
-                    orderBy: {
-                        createdAt: 'desc',
-                    }
-                }
             },
         });
 
@@ -287,7 +266,6 @@ export class ChatService {
         const socketPayload = {
             type: NotificationType.NEW_CHAT,
             data: newChat,
-            timestamp: new Date(),
         }
         this.chatGatway.server.to(`user_${otherUserId}`).emit("new_chat", socketPayload);
 

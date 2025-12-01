@@ -18,14 +18,15 @@ export class ChatController {
         private readonly messageService: MessageService,
     ) { }
 
+
     @Get()
     async getAllChats(@Req() req) {
         return this.chatService.getAllChats(req.user.sub)
     }
 
-    @Get('/:chatId')
-    async viewChat(@Req() req, @Param('chatId') chatId: string) {
-        return this.chatService.viewChat(req.user.sub, chatId);
+    @Get('/my-chats-ids')
+    async getMyChatsIds(@Req() req) {
+        return this.chatService.getMyChatsIds(req.user.sub);
     }
 
     @Post('/start')
@@ -43,8 +44,16 @@ export class ChatController {
 
     @Post('/:chatId/messages')
     async sendMessage(@Req() req, @Param('chatId') chatId: string, @Body(ValidationPipe) sendMessageDto: SendMessageDto) {
+
         return this.messageService.sendMessage(req.user.sub, chatId, sendMessageDto.content)
     }
+
+    @Get('/:chatId')
+    async viewChat(@Req() req, @Param('chatId') chatId: string) {
+        console.log('Viewing chat:', chatId, 'for user:', req.user.sub);
+        return this.chatService.viewChat(req.user.sub, chatId);
+    }
+
 
     @Delete("/:chatId/messages/:messageId")
     async deleteMessage(@Req() req, @Param('chatId') chatId: string, @Param('messageId') messageId: string) {
@@ -89,13 +98,6 @@ export class ChatController {
     async addToGroupChat(@Req() req, @Param('chatId') chatId: string, @Body(ValidationPipe) dto: AddToChatDto) {
         return this.chatService.addToGroupChat(req.user.sub, chatId, dto.userIds)
     }
-
-    // NEED ROLE to do this
-    // @Delete('/:chatId/participants')
-    // @UseGuards(JwtAuthGuard)
-    // async removeFromGroup(@Param('chatId') chatId: string, @Req() req, @Body(ValidationPipe) dto: RemoveFromGroupChatDto) {
-    //     return this.chatService.removeFromGroup(req.user.sub, chatId, dto)
-    // }
 
     @Post('/:chatId/participants/join-group')
     async joinGroup(@Req() req, @Param('chatId') chatId: string) {

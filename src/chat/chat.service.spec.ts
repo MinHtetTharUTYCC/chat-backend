@@ -6,6 +6,7 @@ import { NotificationService } from 'src/notification/notification.service';
 import { DatabaseService } from 'src/database/database.service';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -249,7 +250,7 @@ describe('ChatService', () => {
 
   describe("getChat", () => {
     const chatId = 'chat-id-1';
-    const cachedKey = `chat:${chatId}:latest`;
+    const cachedKey = `chat:${chatId}`;
 
     const mockResult = {
       id: chatId,
@@ -354,6 +355,43 @@ describe('ChatService', () => {
       expect(mockEmit).not.toHaveBeenCalled();
       expect(cacheManager.del).not.toHaveBeenCalledTimes(2);
       expect(result).toEqual(mockExistingChat);
+    })
+
+    // Path: 4 Success - Start chat creation
+    it('should crate a new dm chat, send notification,emit socket event,and invalidate cache', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({ id: otherUserId });
+      mockDatabaseService.chat.findFirst.mockResolvedValue(null); //mock no existing chat
+      mockDatabaseService.chat.create.mockResolvedValue(mockNewChat);
+
+      // ACT
+      const result = await service.startChat(userId, otherUserId);
+
+      // ASSERT
+      expect(databaseService.chat.findFirst).toHaveBeenCalled()
+      expect(databaseService.chat.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: {
+          participants: {
+            create: [
+              { userId },
+              { userId: otherUserId },
+            ]
+          }
+        }
+      }))
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(userId, mockNewChat.id, { receiverId: otherUserId, type: NotificationType.NEW_CHAT })
+      expect(mockChatGateway.server.to).toHaveBeenCalledWith(`user_${otherUserId}`);
+      expect(mockEmit).toHaveBeenCalledWith('new_chat', expect.objectContaining({
+        type: NotificationType.NEW_CHAT,
+        data: mockNewChat,
+      }));
+      expect(cacheManager.del).toHaveBeenCalledWith(`user:${userId}:chats`);
+      expect(cacheManager.del).toHaveBeenCalledWith(`user:${otherUserId}:chats`);
+      expect(cacheManager.del).toHaveBeenCalledTimes(2);
+
+      expect(result).toEqual(mockNewChat);
+
+
     })
   })
 });

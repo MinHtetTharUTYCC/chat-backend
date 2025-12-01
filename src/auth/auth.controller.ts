@@ -1,11 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
-// import type { Response } from 'express';
 import express from 'express';
 import { RegisterDto } from './dto/register.dto';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
-import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -21,8 +19,8 @@ export class AuthController {
         // set refres tokens only in httpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
+            secure: false,
+            sameSite: 'lax',
             path: '/auth/refresh',
         });
 
@@ -31,6 +29,7 @@ export class AuthController {
             user
         };
     }
+
 
     @HttpCode(HttpStatus.CREATED)
     @Post('/register')
@@ -41,15 +40,17 @@ export class AuthController {
         // set refresh tokens only in HttpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
+            secure: false,
+            sameSite: 'lax',
             path: '/auth/refresh',
         });
+
 
         return {
             accessToken,
             user
         };
+
     };
 
     @Post('/refresh')
@@ -72,6 +73,7 @@ export class AuthController {
 
         return res.json({ accessToken })
     }
+
 
     @Post('/logout')
     @UseGuards(JwtAuthGuard)
