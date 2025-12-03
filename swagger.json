@@ -477,7 +477,7 @@
       }
     },
     "/chats/{chatId}/update-title": {
-      "put": {
+      "patch": {
         "operationId": "ChatController_updateChatTitle",
         "parameters": [
           {

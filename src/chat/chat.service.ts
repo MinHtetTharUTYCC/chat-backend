@@ -1,23 +1,30 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Inject,
+    Injectable,
+    NotFoundException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { ChatGateway } from './chat.gateway';
 import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
-import { CACHE_MANAGER } from "@nestjs/cache-manager"
-import type { Cache } from "cache-manager"
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { MessageService } from 'src/message/message.service';
-
 
 @Injectable()
 export class ChatService {
     constructor(
         private readonly databaseService: DatabaseService,
-        private readonly chatGatway: ChatGateway,
+        private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
         private readonly messageService: MessageService,
         @Inject(CACHE_MANAGER)
         private cacheManager: Cache,
-    ) { }
+    ) {}
 
     // moved to sepearte module
     // async onModuleInit() {
@@ -47,20 +54,20 @@ export class ChatService {
         //check redis
         const cachedData = await this.cacheManager.get(cacheKey);
         if (cachedData) {
-            console.log("Returning chats from cache..")
+            console.log('Returning chats from cache..');
             return cachedData;
         }
 
         const chats = await this.databaseService.chat.findMany({
             where: {
                 participants: {
-                    some: { userId }
-                }
+                    some: { userId },
+                },
             },
             include: {
                 messages: {
                     orderBy: {
-                        createdAt: 'desc'
+                        createdAt: 'desc',
                     },
                     take: 1,
                 },
@@ -70,15 +77,12 @@ export class ChatService {
                             select: {
                                 id: true,
                                 username: true,
-                            }
-                        }
-                    }
-                }
+                            },
+                        },
+                    },
+                },
             },
-            orderBy: [
-                { lastMessageAt: 'desc' },
-                { updatedAt: 'desc' },
-            ]
+            orderBy: [{ lastMessageAt: 'desc' }, { updatedAt: 'desc' }],
         });
 
         //save to redis(TTL-time_to_live: 5min)
@@ -88,15 +92,17 @@ export class ChatService {
     }
 
     async viewChat(userId: string, chatId: string) {
-        const isParticipant = await this.databaseService.participant.findUnique({
-            where: {
-                userId_chatId: {
-                    userId,
-                    chatId
-                }
+        const isParticipant = await this.databaseService.participant.findUnique(
+            {
+                where: {
+                    userId_chatId: {
+                        userId,
+                        chatId,
+                    },
+                },
+                select: { id: true },
             },
-            select: { id: true }
-        });
+        );
 
         if (isParticipant) {
             return this.getChat(chatId);
@@ -108,16 +114,18 @@ export class ChatService {
                 _count: {
                     select: {
                         participants: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
 
         if (!chat) {
-            throw new NotFoundException("Chat not found");
+            throw new NotFoundException('Chat not found');
         }
         if (!chat.isGroup) {
-            throw new ForbiddenException("You cannot view private chats of others")
+            throw new ForbiddenException(
+                'You cannot view private chats of others',
+            );
         }
 
         return {
@@ -130,13 +138,13 @@ export class ChatService {
         const cachedKey = `chat:${chatId}`;
         const cachedResult = await this.cacheManager.get(cachedKey);
         if (cachedResult) {
-            console.log("Returing latest chat from cache...");
+            console.log('Returing latest chat from cache...');
             return cachedResult;
         }
 
         const chat = await this.databaseService.chat.findUnique({
             where: {
-                id: chatId,//'am i participant?' is already checked at viewChat()
+                id: chatId, //'am i participant?' is already checked at viewChat()
             },
             include: {
                 participants: {
@@ -145,9 +153,9 @@ export class ChatService {
                             select: {
                                 id: true,
                                 username: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 messages: {
                     include: {
@@ -155,18 +163,18 @@ export class ChatService {
                             select: {
                                 id: true,
                                 username: true,
-                            }
-                        }
+                            },
+                        },
                     },
                     take: 20,
                     orderBy: {
                         createdAt: 'desc',
-                    }
+                    },
                 },
             },
         });
 
-        if (!chat) throw new NotFoundException("Chat not found");
+        if (!chat) throw new NotFoundException('Chat not found');
 
         await this.cacheManager.set(cachedKey, chat, 300 * 1000); //5 minutes
 
@@ -175,34 +183,34 @@ export class ChatService {
 
     async startChat(userId: string, otherUserId: string) {
         if (userId === otherUserId) {
-            throw new BadRequestException("You cannot chat with yourself")
+            throw new BadRequestException('You cannot chat with yourself');
         }
         // check if other user is valid
         const otherUser = await this.databaseService.user.findUnique({
             where: { id: otherUserId },
-            select: { id: true }
-        })
-        if (!otherUser) throw new NotFoundException("User not found")
+            select: { id: true },
+        });
+        if (!otherUser) throw new NotFoundException('User not found');
 
         //check if chat exists already
         const existingChat = await this.databaseService.chat.findFirst({
             where: {
                 participants: {
-                    some: { userId }
+                    some: { userId },
                 },
                 AND: [
                     {
                         participants: {
                             some: {
                                 userId: otherUserId,
-                            }
-                        }
+                            },
+                        },
                     },
                     //sure it's a DM, not GroupChat
                     {
                         isGroup: false,
-                    }
-                ]
+                    },
+                ],
             },
             include: {
                 participants: {
@@ -212,18 +220,18 @@ export class ChatService {
                                 id: true,
                                 username: true,
                                 email: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 messages: {
                     orderBy: {
                         createdAt: 'desc',
                     },
                     take: 1,
-                }
-            }
-        })
+                },
+            },
+        });
 
         if (existingChat) return existingChat;
 
@@ -231,11 +239,8 @@ export class ChatService {
         const newChat = await this.databaseService.chat.create({
             data: {
                 participants: {
-                    create: [
-                        { userId },
-                        { userId: otherUserId }
-                    ]
-                }
+                    create: [{ userId }, { userId: otherUserId }],
+                },
             },
             include: {
                 participants: {
@@ -245,29 +250,31 @@ export class ChatService {
                                 id: true,
                                 username: true,
                                 email: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 messages: {
                     orderBy: {
                         createdAt: 'desc',
                     },
                     take: 1,
-                }
-            }
+                },
+            },
         });
 
         await this.notificationService.createNotification(userId, newChat.id, {
             receiverId: otherUserId,
-            type: NotificationType.NEW_CHAT
-        })
+            type: NotificationType.NEW_CHAT,
+        });
 
         const socketPayload = {
             type: NotificationType.NEW_CHAT,
             data: newChat,
-        }
-        this.chatGatway.server.to(`user_${otherUserId}`).emit("new_chat", socketPayload);
+        };
+        this.chatGateway.server
+            .to(`user_${otherUserId}`)
+            .emit('new_chat', socketPayload);
 
         // Invalidate cache for both users
         await this.cacheManager.del(`user:${userId}:chats`);
@@ -280,14 +287,14 @@ export class ChatService {
         const chats = await this.databaseService.chat.findMany({
             where: {
                 participants: {
-                    some: { userId }
-                }
+                    some: { userId },
+                },
             },
             select: {
                 participants: {
-                    select: { userId: true }
-                }
-            }
+                    select: { userId: true },
+                },
+            },
         });
 
         // extract all participants ID except me
@@ -310,56 +317,104 @@ export class ChatService {
                 participants: {
                     some: {
                         userId,
-                    }
-                }
+                    },
+                },
             },
             select: {
                 id: true,
-            }
+            },
         });
 
-        return chats.map(chat => chat.id);
+        return chats.map((chat) => chat.id);
     }
 
     async updateChatTitle(userId: string, chatId: string, newTitle: string) {
-        const chat = await this.databaseService.chat.findUnique({
-            where: { id: chatId, participants: { some: { userId } } },
-            select: {
-                id: true,
-                isGroup: true,
-            }
-        })
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const chat = await tx.chat.findUnique({
+                where: { id: chatId },
+                select: {
+                    id: true,
+                    isGroup: true,
+                    participants: {
+                        select: {
+                            userId: true,
+                        },
+                    },
+                },
+            });
 
-        if (!chat) throw new NotFoundException("Chat not found")
+            const participant = await tx.participant.findUnique({
+                where: {
+                    userId_chatId: {
+                        userId,
+                        chatId,
+                    },
+                },
+                select: {
+                    user: {
+                        select: {
+                            username: true,
+                        },
+                    },
+                },
+            });
 
-        if (!chat.isGroup) throw new ForbiddenException("Direct messages cannot have custom titles")
+            return { chat, participant };
+        });
+
+        if (!result.chat) throw new NotFoundException('Chat not found');
+        if (!result.chat.isGroup)
+            throw new ForbiddenException(
+                'Direct messages cannot have custom titles',
+            );
+
+        if (!result.participant)
+            throw new ForbiddenException('You are not the member of this chat');
 
         const dataToUpdate = {
             title: newTitle === '' ? null : newTitle,
-        }
+        };
 
         await this.databaseService.chat.update({
             where: { id: chatId },
             data: dataToUpdate,
         });
 
+        // INVALIDATE Cache
+        //del chat details
+        await this.cacheManager.del(`chat:${chatId}`);
+        //del chats
+        const promises = result.chat.participants.map((parti) =>
+            this.cacheManager.del(`user:${parti.userId}:chats`),
+        );
+        await Promise.all(promises);
+
+        // Broadcast via WS
+        this.chatGateway.server.to(`chat_${chatId}`).emit('title_update', {
+            chatId,
+            newTitle,
+            updatedById: userId,
+            updatedByUsername: result.participant.user.username,
+        });
+
         return {
             success: true,
             chatId,
             newTitle,
-        }
+        };
     }
 
     async createGroupChat(userId: string, title: string, userIds: string[]) {
         // Set: for removing dupblicates
-        let uniqueUserIds = new Set<string>([
-            ...userIds,
-            userId,
-        ])
-        const usersToParticipate = Array.from(uniqueUserIds).map(id => ({ userId: id }))
+        let uniqueUserIds = new Set<string>([...userIds, userId]);
+        const usersToParticipate = Array.from(uniqueUserIds).map((id) => ({
+            userId: id,
+        }));
 
         if (usersToParticipate.length < 2) {
-            throw new BadRequestException("A group must have at least 2 participants")
+            throw new BadRequestException(
+                'A group must have at least 2 participants',
+            );
         }
 
         const groupChat = await this.databaseService.chat.create({
@@ -368,7 +423,7 @@ export class ChatService {
                 title: title || 'New Group',
                 participants: {
                     create: usersToParticipate,
-                }
+                },
             },
             include: {
                 participants: {
@@ -377,16 +432,17 @@ export class ChatService {
                             select: {
                                 id: true,
                                 username: true,
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         });
 
-        uniqueUserIds.delete(userId);//deduct me
-        const usersToNotify = Array.from(uniqueUserIds).map(id => `user_${id}`);
-
+        uniqueUserIds.delete(userId); //deduct me
+        const usersToNotify = Array.from(uniqueUserIds).map(
+            (id) => `user_${id}`,
+        );
 
         await Promise.all(
             Array.from(uniqueUserIds).map(async (id) => {
@@ -395,23 +451,26 @@ export class ChatService {
                     groupChat.id,
                     {
                         receiverId: id,
-                        type: NotificationType.GROUP_ADDED
-                    })
-            })
+                        type: NotificationType.GROUP_ADDED,
+                    },
+                );
+            }),
         );
 
         const socketPayload = {
             type: NotificationType.GROUP_ADDED,
             data: groupChat,
-            timestam: new Date()
-        }
-        this.chatGatway.server.to(usersToNotify).emit("group_added", socketPayload);
+            timestam: new Date(),
+        };
+        this.chatGateway.server
+            .to(usersToNotify)
+            .emit('group_added', socketPayload);
 
         // Invalidate cache
         await Promise.all(
             Array.from([...uniqueUserIds, userId]).map(async (id) => {
                 await this.cacheManager.del(`user:${id}:chats`);
-            })
+            }),
         );
 
         return groupChat;
@@ -427,18 +486,26 @@ export class ChatService {
                         userId,
                     },
                     select: {
-                        id: true
-                    }
-                }
-            }
-        })
-        if (!chat) throw new NotFoundException("Chat not found")
-        if (chat.participants.length === 0) throw new ForbiddenException("You are not a member of this chat")
-        if (!chat.isGroup) throw new ForbiddenException("You cannot add members to 1-on-1 chat. Create a group instead.")
+                        id: true,
+                    },
+                },
+            },
+        });
+        if (!chat) throw new NotFoundException('Chat not found');
+        if (chat.participants.length === 0)
+            throw new ForbiddenException('You are not a member of this chat');
+        if (!chat.isGroup)
+            throw new ForbiddenException(
+                'You cannot add members to 1-on-1 chat. Create a group instead.',
+            );
 
-        const uniqueUserIds = new Set(userIds.filter(id => id !== userId)); //filter me(if exists) and remove duplicates
-        const newUsersToParticipate = Array.from(uniqueUserIds).map((id) => ({ userId: id }));
-        const newUsersToNotify = Array.from(uniqueUserIds).map(id => `user_${id}`);
+        const uniqueUserIds = new Set(userIds.filter((id) => id !== userId)); //filter me(if exists) and remove duplicates
+        const newUsersToParticipate = Array.from(uniqueUserIds).map((id) => ({
+            userId: id,
+        }));
+        const newUsersToNotify = Array.from(uniqueUserIds).map(
+            (id) => `user_${id}`,
+        );
 
         try {
             const updatedChat = await this.databaseService.chat.update({
@@ -448,7 +515,7 @@ export class ChatService {
                 data: {
                     participants: {
                         create: newUsersToParticipate,
-                    }
+                    },
                 },
                 include: {
                     participants: {
@@ -457,64 +524,72 @@ export class ChatService {
                                 select: {
                                     id: true,
                                     username: true,
-                                }
-                            }
-                        }
-                    }
-                }
+                                },
+                            },
+                        },
+                    },
+                },
             });
 
             await Promise.all(
                 Array.from(uniqueUserIds).map(async (id) => {
-                    await this.notificationService.createNotification(userId, chatId, {
-                        receiverId: id,
-                        type: NotificationType.GROUP_ADDED,
-                    })
-                })
-            )
+                    await this.notificationService.createNotification(
+                        userId,
+                        chatId,
+                        {
+                            receiverId: id,
+                            type: NotificationType.GROUP_ADDED,
+                        },
+                    );
+                }),
+            );
 
             const sockerPayload = {
                 type: NotificationType.GROUP_ADDED,
                 data: updatedChat,
                 timestam: new Date(),
-            }
+            };
 
-            this.chatGatway.server.to(newUsersToNotify).emit("group_added", sockerPayload);
+            this.chatGateway.server
+                .to(newUsersToNotify)
+                .emit('group_added', sockerPayload);
 
             // Invalidate cache
             await Promise.all(
                 Array.from(uniqueUserIds).map(async (id) => {
                     await this.cacheManager.del(`user:${id}:chats`);
-                })
-            )
+                }),
+            );
 
             return updatedChat;
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new BadRequestException("One or more users do not exist")
+                throw new BadRequestException('One or more users do not exist');
             }
             throw error;
         }
     }
 
     async joinGroup(userId: string, chatId: string) {
-        const existingParticipant = await this.databaseService.participant.findUnique({
-            where: {
-                userId_chatId: {
-                    userId,
-                    chatId
-                }
-            },
-            select: {
-                id: true,
-            }
-        });
-        if (existingParticipant) throw new ConflictException("Already joined the chat");
+        const existingParticipant =
+            await this.databaseService.participant.findUnique({
+                where: {
+                    userId_chatId: {
+                        userId,
+                        chatId,
+                    },
+                },
+                select: {
+                    id: true,
+                },
+            });
+        if (existingParticipant)
+            throw new ConflictException('Already joined the chat');
 
         await this.databaseService.participant.create({
             data: {
                 userId,
-                chatId
+                chatId,
             },
             select: {
                 id: true,
@@ -522,26 +597,27 @@ export class ChatService {
                     select: {
                         id: true,
                         username: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
 
         const socketPaylod = {
             chatId,
             timestamp: new Date(),
-        }
+        };
 
         // update UI immediately
-        this.chatGatway.server.to(`user_${userId}`).emit("group_joined", socketPaylod);
-
+        this.chatGateway.server
+            .to(`user_${userId}`)
+            .emit('group_joined', socketPaylod);
 
         // VALIDATE chats cache
         await this.cacheManager.del(`user:${userId}:chats`);
 
         return {
             success: true,
-            message: "Successfully joined the group chat."
+            message: 'Successfully joined the group chat.',
         };
     }
 
@@ -553,24 +629,26 @@ export class ChatService {
                 userId_chatId: {
                     userId,
                     chatId,
-                }
+                },
             },
         });
 
         const socketPaylod = {
             chatId,
             timestamp: new Date(),
-        }
+        };
 
         // update UI immediately
-        this.chatGatway.server.to(`user_${userId}`).emit("group_leaved", socketPaylod);
+        this.chatGateway.server
+            .to(`user_${userId}`)
+            .emit('group_leaved', socketPaylod);
 
         // invalidate chats cache
         await this.cacheManager.del(`user:${userId}:chats`);
 
         return {
             success: true,
-            message: 'Successfully leaved the chat'
-        }
+            message: 'Successfully leaved the chat',
+        };
     }
 }

@@ -250,7 +250,7 @@ export class MessageService {
     ) {
         await this.verifyMembership(userId, chatId);
 
-        const cachedKey = `chat:${chatId}:pinned_messages:latest`;
+        const cachedKey = `chat:${chatId}:messages:pinned`;
 
         if (!cursor) {
             const cachedResult = await this.cacheManager.get(cachedKey);
@@ -267,10 +267,10 @@ export class MessageService {
                 },
                 skip: cursor ? 1 : 0,
                 cursor: cursor ? { id: cursor } : undefined,
-                take: limit,
                 orderBy: {
                     createdAt: 'desc',
                 },
+                take: 20,
                 include: {
                     user: {
                         select: {
@@ -297,7 +297,7 @@ export class MessageService {
         }
 
         return {
-            data: pinnedMessages,
+            pinnedMessages,
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
@@ -430,7 +430,7 @@ export class MessageService {
             // INVALIDATE Cache
             const keysToDelete = [
                 `chat:${chatId}:messages`,
-                `chat:${chatId}:pinned_messages:latest`, // i have pinned message (api end point)
+                `chat:${chatId}:messages:pinned`, // i have pinned message (api end point)
             ];
             await this.cacheManager.del(keysToDelete[0]);
             await this.cacheManager.del(keysToDelete[1]);

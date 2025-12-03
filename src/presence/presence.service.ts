@@ -26,7 +26,7 @@ export class PresenceService {
 
     async heartbeating(userId: string) {
         //Refresh TTL
-        await this.redisService.client.expire(`presence:${userId}`, 300);
+        await this.redisService.client.expire(`presence:${userId}`, 300); //5 minutes: 300 seconds
     }
 
     async getPresence(userId: string) {
@@ -85,6 +85,7 @@ export class PresenceService {
         });
 
         const results = await pipeline.exec();
+        console.log(results);
 
         if (!results) {
             return {};
@@ -92,7 +93,7 @@ export class PresenceService {
 
         const presence: Record<
             string,
-            { online: boolean; lastSeen: Date | null }
+            { online: boolean; lastSeen: string | null }
         > = {};
 
         userIds.forEach((userId, i) => {
@@ -100,15 +101,15 @@ export class PresenceService {
             const onlineResult = results[i * 2]?.[1];
             const lastSeenResult = results[i * 2 + 1]?.[1];
 
-            // Extract values with proper type checking
-            const onlineValue = onlineResult?.[1] as string | null;
-            const lastSeenValue = lastSeenResult?.[1] as string | null;
+            console.log('+++', i, onlineResult, lastSeenResult);
+
+            // values with type checking
+            const onlineValue = onlineResult as string | null;
+            const lastSeenValue = lastSeenResult as string | null;
 
             presence[userId] = {
                 online: onlineValue === 'online',
-                lastSeen: lastSeenValue
-                    ? new Date(parseInt(lastSeenValue, 10))
-                    : null,
+                lastSeen: lastSeenValue,
             };
         });
 

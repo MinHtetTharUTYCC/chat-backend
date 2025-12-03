@@ -46,7 +46,6 @@ export class ChatGateway
         server.use((socket, next) => {
             try {
                 const token = socket.handshake.auth?.token;
-                console.log('Socket trying to connect with token: ', token);
                 if (!token) return next(new Error('Missing token'));
 
                 const payload = this.jwtService.verify(token, {
