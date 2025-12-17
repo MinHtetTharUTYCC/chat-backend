@@ -2,18 +2,15 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
-    Inject,
     Injectable,
     NotFoundException,
-    OnModuleInit,
 } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { ChatGateway } from './chat.gateway';
 import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
 import { MessageService } from 'src/message/message.service';
+import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class ChatService {
@@ -22,40 +19,19 @@ export class ChatService {
         private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
         private readonly messageService: MessageService,
-        @Inject(CACHE_MANAGER)
-        private cacheManager: Cache,
+        private redisService: RedisService,
     ) {}
-
-    // moved to sepearte module
-    // async onModuleInit() {
-    //     const cache = this.cacheManager as any;
-
-    //     // Try to find the Redis Client in the possible locations:
-    //     // 1. cache.store.client (Standard v4)
-    //     // 2. cache.stores[0].client (Multi-cache / v5 specific wrappers)
-    //     // 3. cache.client (If the store was merged into the object)
-    //     const redisClient = cache.store?.client ?? cache.stores?.[0]?.client ?? cache.client;
-
-    //     if (redisClient) {
-    //         console.log('✅ REDIS CONNECTION SUCCESSFUL');
-
-    //         // Test by listing keys
-    //         const keys = await redisClient.keys('*');
-    //         console.log('🔑 keys in redis:', keys);
-    //     } else {
-    //         console.error('❌ REDIS CLIENT NOT FOUND. Printing Cache Object for debugging:');
-    //         console.log(Object.keys(cache)); // This will show us what properties ACTUALLY exist
-    //     }
-    // }
 
     async getAllChats(userId: string) {
         const cacheKey = `user:${userId}:chats`;
 
         //check redis
-        const cachedData = await this.cacheManager.get(cacheKey);
-        if (cachedData) {
+        const cached = await this.redisService.get(cacheKey);
+        const cachedResult = cached ? JSON.parse(cached) : null;
+
+        if (cachedResult) {
             console.log('Returning chats from cache..');
-            return cachedData;
+            return cachedResult;
         }
 
         const chats = await this.databaseService.chat.findMany({
@@ -86,7 +62,7 @@ export class ChatService {
         });
 
         //save to redis(TTL-time_to_live: 5min)
-        await this.cacheManager.set(cacheKey, chats, 300 * 1000);
+        await this.redisService.set(cacheKey, JSON.stringify(chats), 300);
 
         return chats;
     }
@@ -136,9 +112,11 @@ export class ChatService {
 
     async getChat(chatId: string) {
         const cachedKey = `chat:${chatId}`;
-        const cachedResult = await this.cacheManager.get(cachedKey);
+        const cached = await this.redisService.get(cachedKey);
+        const cachedResult = cached ? JSON.parse(cached) : null;
+
         if (cachedResult) {
-            console.log('Returing latest chat from cache...');
+            console.log('Returning latest chat from cache...');
             return cachedResult;
         }
 
@@ -176,7 +154,7 @@ export class ChatService {
 
         if (!chat) throw new NotFoundException('Chat not found');
 
-        await this.cacheManager.set(cachedKey, chat, 300 * 1000); //5 minutes
+        await this.redisService.set(cachedKey, JSON.stringify(chat), 300); //5 minutes
 
         return chat;
     }
@@ -212,28 +190,16 @@ export class ChatService {
                     },
                 ],
             },
-            include: {
-                participants: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                                email: true,
-                            },
-                        },
-                    },
-                },
-                messages: {
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    take: 1,
-                },
+            select: {
+                id: true,
             },
         });
 
-        if (existingChat) return existingChat;
+        if (existingChat)
+            return {
+                oldChatExists: true,
+                chat: existingChat,
+            };
 
         //create new chat
         const newChat = await this.databaseService.chat.create({
@@ -242,24 +208,8 @@ export class ChatService {
                     create: [{ userId }, { userId: otherUserId }],
                 },
             },
-            include: {
-                participants: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                                email: true,
-                            },
-                        },
-                    },
-                },
-                messages: {
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    take: 1,
-                },
+            select: {
+                id: true,
             },
         });
 
@@ -277,10 +227,13 @@ export class ChatService {
             .emit('new_chat', socketPayload);
 
         // Invalidate cache for both users
-        await this.cacheManager.del(`user:${userId}:chats`);
-        await this.cacheManager.del(`user:${otherUserId}:chats`);
+        await this.redisService.del(`user:${userId}:chats`);
+        await this.redisService.del(`user:${otherUserId}:chats`);
 
-        return newChat;
+        return {
+            oldChatExists: false,
+            chat: newChat,
+        };
     }
 
     async getMyFriendsIds(userId: string) {
@@ -382,10 +335,10 @@ export class ChatService {
 
         // INVALIDATE Cache
         //del chat details
-        await this.cacheManager.del(`chat:${chatId}`);
+        await this.redisService.del(`chat:${chatId}`);
         //del chats
         const promises = result.chat.participants.map((parti) =>
-            this.cacheManager.del(`user:${parti.userId}:chats`),
+            this.redisService.del(`user:${parti.userId}:chats`),
         );
         await Promise.all(promises);
 
@@ -436,6 +389,16 @@ export class ChatService {
                         },
                     },
                 },
+                messages: {
+                    include: {
+                        sender: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
+                        },
+                    },
+                },
             },
         });
 
@@ -460,8 +423,8 @@ export class ChatService {
         const socketPayload = {
             type: NotificationType.GROUP_ADDED,
             data: groupChat,
-            timestam: new Date(),
         };
+
         this.chatGateway.server
             .to(usersToNotify)
             .emit('group_added', socketPayload);
@@ -469,7 +432,7 @@ export class ChatService {
         // Invalidate cache
         await Promise.all(
             Array.from([...uniqueUserIds, userId]).map(async (id) => {
-                await this.cacheManager.del(`user:${id}:chats`);
+                await this.redisService.del(`user:${id}:chats`);
             }),
         );
 
@@ -544,20 +507,19 @@ export class ChatService {
                 }),
             );
 
-            const sockerPayload = {
+            const socketPayload = {
                 type: NotificationType.GROUP_ADDED,
                 data: updatedChat,
-                timestam: new Date(),
             };
 
             this.chatGateway.server
                 .to(newUsersToNotify)
-                .emit('group_added', sockerPayload);
+                .emit('group_added', socketPayload);
 
             // Invalidate cache
             await Promise.all(
                 Array.from(uniqueUserIds).map(async (id) => {
-                    await this.cacheManager.del(`user:${id}:chats`);
+                    await this.redisService.del(`user:${id}:chats`);
                 }),
             );
 
@@ -613,7 +575,7 @@ export class ChatService {
             .emit('group_joined', socketPaylod);
 
         // VALIDATE chats cache
-        await this.cacheManager.del(`user:${userId}:chats`);
+        await this.redisService.del(`user:${userId}:chats`);
 
         return {
             success: true,
@@ -644,7 +606,7 @@ export class ChatService {
             .emit('group_leaved', socketPaylod);
 
         // invalidate chats cache
-        await this.cacheManager.del(`user:${userId}:chats`);
+        await this.redisService.del(`user:${userId}:chats`);
 
         return {
             success: true,

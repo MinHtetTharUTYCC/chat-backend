@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# NestJS build artifacts
+dist
+
+# Git artifacts
+.git
+.gitignore
+
+# Docker artifacts
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment files
+# .env
+# .env.*
+
+# Editor/OS specific files
+.vscode
+npm-debug.log
+yarn-error.log

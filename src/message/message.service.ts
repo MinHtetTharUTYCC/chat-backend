@@ -1,20 +1,15 @@
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
     ConflictException,
     ForbiddenException,
-    Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { ChatGateway } from 'src/chat/chat.gateway';
-import { EditMessageDto } from 'src/chat/dto/edit-message.dto';
-
-import { SendMessageDto } from 'src/chat/dto/sendMessage.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class MessageService {
@@ -22,8 +17,7 @@ export class MessageService {
         private readonly databaseService: DatabaseService,
         private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
-        @Inject(CACHE_MANAGER)
-        private cacheManager: Cache,
+        private redisService: RedisService,
     ) {}
 
     async sendMessage(userId: string, chatId: string, content: string) {
@@ -69,11 +63,11 @@ export class MessageService {
         // INVALIDATE Cache
         //del chats
         const promises = result.updatedChat.participants.map((parti) =>
-            this.cacheManager.del(`user:${parti.userId}:chats`),
+            this.redisService.del(`user:${parti.userId}:chats`),
         );
         await Promise.all(promises);
 
-        await this.cacheManager.del(`chat:${chatId}:messages`);
+        await this.redisService.del(`chat:${chatId}:messages`);
 
         return result.newMessage;
     }
@@ -81,50 +75,206 @@ export class MessageService {
     async getMessages(
         userId: string,
         chatId: string,
-        cursor?: string,
+        searchParams: {
+            prevCursor?: string;
+            nextCursor?: string;
+            aroundMessageId?: string;
+            aroundDate?: number;
+        },
         limit: number = 20,
     ) {
         await this.verifyMembership(userId, chatId);
 
         const latestMessageKey = `chat:${chatId}:messages`;
 
-        if (!cursor) {
-            const cachedResult = await this.cacheManager.get(latestMessageKey);
+        const fetchingToUp = !!searchParams.nextCursor; //GETTTING OLDER
+        const fetchingToBottom = !!searchParams.prevCursor; //GETTING NEWER
+        const jumpingToMessage = !!searchParams.aroundMessageId; //PINNED OR SEARCH
+        const jumpingToDate = !!searchParams.aroundDate;
+
+        const activeCursor = searchParams.nextCursor || searchParams.prevCursor;
+
+        // Cache only for initial load (latest messages, no params)
+        if (!activeCursor && !jumpingToMessage && !jumpingToDate) {
+            const cacheded = await this.redisService.get(latestMessageKey);
+            const cachedResult = cacheded ? JSON.parse(cacheded) : null;
+
             if (cachedResult) {
                 console.log('Returning messages + meta from cache...');
                 return cachedResult;
             }
         }
 
-        const messages = await this.databaseService.message.findMany({
-            where: { chatId },
-            take: limit,
-            skip: cursor ? 1 : 0, //skip the cursor itself
-            cursor: cursor ? { id: cursor } : undefined,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                sender: {
-                    select: { id: true, username: true },
-                },
-            },
-        });
+        let messages: any[];
+        let anchorMessage: any = null;
 
-        let nextCursor: string | null = null;
-        // if .length is fewer than limit, it reached the end
-        if (messages.length === limit && messages.length > 0) {
-            nextCursor = messages[messages.length - 1].id;
+        if (jumpingToMessage) {
+            anchorMessage = await this.databaseService.message.findUnique({
+                where: { id: searchParams.aroundMessageId },
+                include: {
+                    sender: {
+                        select: { id: true, username: true },
+                    },
+                },
+            });
+
+            if (!anchorMessage) {
+                throw new NotFoundException('Message not found');
+            }
+            // Get messages around this anchor (half before, half after)
+            const halfLimit = Math.floor(limit / 2);
+
+            const [olderMessages, newerMessages] = await Promise.all([
+                // Older messages
+                this.databaseService.message.findMany({
+                    where: {
+                        chatId,
+                        createdAt: { lt: anchorMessage.createdAt },
+                    },
+                    take: halfLimit,
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        sender: {
+                            select: { id: true, username: true },
+                        },
+                    },
+                }),
+                // Newer messages
+                this.databaseService.message.findMany({
+                    where: {
+                        chatId,
+                        createdAt: { gt: anchorMessage.createdAt },
+                    },
+                    take: halfLimit,
+                    orderBy: { createdAt: 'asc' },
+                    include: {
+                        sender: {
+                            select: { id: true, username: true },
+                        },
+                    },
+                }),
+            ]);
+
+            // Combine: older (reversed) + anchor + newer
+            messages = [
+                ...olderMessages.reverse(),
+                anchorMessage,
+                ...newerMessages,
+            ];
+        } else if (jumpingToDate && !!searchParams.aroundDate) {
+            const targetDate = new Date(searchParams.aroundDate);
+            const halfLimit = Math.floor(limit / 2);
+
+            const [olderMessages, newerMessages] = await Promise.all([
+                // Older messages
+                this.databaseService.message.findMany({
+                    where: {
+                        chatId,
+                        createdAt: { lt: targetDate },
+                    },
+                    take: halfLimit,
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        sender: {
+                            select: { id: true, username: true },
+                        },
+                    },
+                }),
+                // Newer messages
+                this.databaseService.message.findMany({
+                    where: {
+                        chatId,
+                        createdAt: { gte: targetDate },
+                    },
+                    take: halfLimit,
+                    orderBy: { createdAt: 'asc' },
+                    include: {
+                        sender: {
+                            select: { id: true, username: true },
+                        },
+                    },
+                }),
+            ]);
+
+            messages = [...olderMessages.reverse(), ...newerMessages];
+        } else {
+            // Regular (forward or backward)
+            const orderByDirection: 'desc' | 'asc' = fetchingToBottom
+                ? 'asc'
+                : 'desc';
+
+            messages = await this.databaseService.message.findMany({
+                where: { chatId },
+                take: limit,
+                skip: activeCursor ? 1 : 0, //skip the cursor itself
+                cursor: activeCursor ? { id: activeCursor } : undefined,
+                orderBy: { createdAt: orderByDirection },
+                include: {
+                    sender: {
+                        select: { id: true, username: true },
+                    },
+                },
+            });
+        }
+
+        let nextCursor: string | null = null; // for OLDER items
+        let prevCursor: string | null = null; // for NEWER items
+        let messagesSorted: any[] = [];
+
+        if (messages.length > 0) {
+            // find oldest and newest
+            messagesSorted = [...messages].sort(
+                (a, b) =>
+                    new Date(a.createdAt).getTime() -
+                    new Date(b.createdAt).getTime(),
+            );
+
+            const oldestMessage = messagesSorted[0];
+            const newestMessage = messagesSorted[messagesSorted.length - 1];
+
+            // Check if there are older messages
+            const hasOlderCount = await this.databaseService.message.count({
+                where: {
+                    chatId,
+                    createdAt: { lt: oldestMessage.createdAt },
+                },
+            });
+            // Check if there are newer messages
+            const hasNewerCount = await this.databaseService.message.count({
+                where: {
+                    chatId,
+                    createdAt: { gt: newestMessage.createdAt },
+                },
+            });
+
+            if (!fetchingToBottom) {
+                nextCursor = hasOlderCount > 0 ? oldestMessage.id : null;
+            }
+
+            if (jumpingToMessage || jumpingToDate || fetchingToBottom) {
+                prevCursor = hasNewerCount > 0 ? newestMessage.id : null;
+            }
         }
 
         const response = {
-            messages,
+            messages: messagesSorted,
             meta: {
-                nextCursor,
-                hasMore: nextCursor !== null,
+                nextCursor, //to load newers(upward)
+                prevCursor, //to load olders(downward)
+                hasMoreNext: nextCursor !== null,
+                hasMorePrev: prevCursor !== null,
+                anchorMessageId: searchParams.aroundMessageId, //for frontend
             },
         };
 
-        if (!cursor) {
-            await this.cacheManager.set(latestMessageKey, response, 300 * 1000); //5 minute
+        // Cache only initial load
+        if (!activeCursor && !jumpingToMessage && !jumpingToDate) {
+            console.log('Setting value...');
+            await this.redisService.set(
+                latestMessageKey,
+                JSON.stringify(response),
+                300, //5 minute
+            );
         }
 
         return response;
@@ -165,12 +315,12 @@ export class MessageService {
 
         // INVALIDATE Cache
         //1: to chat messages
-        await this.cacheManager.del(`chat:${chatId}:messages`);
+        await this.redisService.del(`chat:${chatId}:messages`);
         //2: to all participants's chats list
         // seems aggressive: but unsending is rare: so minimun DB call
         // (instead of checking if message is last message and delete:_can introdude bugs)
         const promises = usersToValidate.map((usrId) =>
-            this.cacheManager.del(`user:${usrId}:chats`),
+            this.redisService.del(`user:${usrId}:chats`),
         );
         await Promise.all(promises);
 
@@ -230,12 +380,12 @@ export class MessageService {
 
         // VALIDATE Cache
         //1: to chat messages
-        await this.cacheManager.del(`chat:${chatId}:messages`);
+        await this.redisService.del(`chat:${chatId}:messages`);
         //2: to all participants's chats list
         // seems aggressive: but unsending is rare: so minimun DB call
         // (instead of checking if message is last message and delete:_can introdude bugs)
         const promises = usersToValidate.map((usrId) =>
-            this.cacheManager.del(`user:${usrId}:chats`),
+            this.redisService.del(`user:${usrId}:chats`),
         );
         await Promise.all(promises);
 
@@ -253,9 +403,14 @@ export class MessageService {
         const cachedKey = `chat:${chatId}:messages:pinned`;
 
         if (!cursor) {
-            const cachedResult = await this.cacheManager.get(cachedKey);
+            const cached = await this.redisService.get(cachedKey);
+            const cachedResult = cached ? JSON.parse(cached) : null;
+
             if (cachedResult) {
-                console.log('Returning pinned messages from cache...');
+                console.log(
+                    'Returning pinned messages from cache...',
+                    cachedResult,
+                );
                 return cachedResult;
             }
         }
@@ -267,10 +422,10 @@ export class MessageService {
                 },
                 skip: cursor ? 1 : 0,
                 cursor: cursor ? { id: cursor } : undefined,
+                take: limit,
                 orderBy: {
                     createdAt: 'desc',
                 },
-                take: 20,
                 include: {
                     user: {
                         select: {
@@ -287,22 +442,29 @@ export class MessageService {
                 },
             });
 
-        if (!cursor) {
-            await this.cacheManager.set(cachedKey, pinnedMessages, 1800 * 1000); //30 minutes
-        }
-
         let nextCursor: string | null = null;
         if (pinnedMessages.length === limit) {
             nextCursor = pinnedMessages[pinnedMessages.length - 1].id;
         }
 
-        return {
+        const response = {
             pinnedMessages,
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
             },
         };
+
+        // cache first page only
+        if (!cursor) {
+            await this.redisService.set(
+                cachedKey,
+                JSON.stringify(response),
+                1800, //30 minutes
+            );
+        }
+
+        return response;
     }
 
     async pinMessage(userId: string, chatId: string, messageId: string) {
@@ -432,8 +594,8 @@ export class MessageService {
                 `chat:${chatId}:messages`,
                 `chat:${chatId}:messages:pinned`, // i have pinned message (api end point)
             ];
-            await this.cacheManager.del(keysToDelete[0]);
-            await this.cacheManager.del(keysToDelete[1]);
+            await this.redisService.del(keysToDelete[0]);
+            await this.redisService.del(keysToDelete[1]);
 
             return pinMessage;
         } catch (error) {

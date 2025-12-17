@@ -6,7 +6,6 @@ import {
     Param,
     Patch,
     Post,
-    Put,
     Query,
     Req,
     UseGuards,
@@ -22,6 +21,7 @@ import { AddToChatDto } from './dto/add-to-chat.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { MessagesPaginationDto } from './dto/messages-pagination.dto';
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
@@ -52,16 +52,38 @@ export class ChatController {
         );
     }
 
+    // @Get('/:chatId/messages/jump')
+    // async jumpToPinnedMsg(
+    //     @Req() req,
+    //     @Param('chatId') chatId: string,
+    //     @Query(new ValidationPipe({ transform: true }))
+    //     query: JumpToPinnedmsgPaginationDto,
+    // ) {
+    //     return this.messageService.jumpToPinnedMsg(
+    //         req.user.sub,
+    //         chatId,
+    //         query.messageId,
+    //         query.limitBefore,
+    //         query.limitAfter,
+    //     );
+    // }
+    
     @Get('/:chatId/messages')
     async getMessages(
         @Req() req,
         @Param('chatId') chatId: string,
-        @Query(new ValidationPipe({ transform: true })) query: PaginationDto,
+        @Query(new ValidationPipe({ transform: true }))
+        query: MessagesPaginationDto,
     ) {
         return this.messageService.getMessages(
             req.user.sub,
             chatId,
-            query.cursor,
+            {
+                prevCursor: query.prevCursor,
+                nextCursor: query.nextCursor,
+                aroundMessageId: query.aroundMessageId,
+                aroundDate: query.aroundDate,
+            },
             query.limit,
         );
     }
@@ -119,7 +141,7 @@ export class ChatController {
     async getPinnedMessages(
         @Req() req,
         @Param('chatId') chatId: string,
-        @Query(ValidationPipe) dto: PaginationDto,
+        @Query(new ValidationPipe({ transform: true })) dto: PaginationDto,
     ) {
         return this.messageService.getPinnedMessages(
             req.user.sub,

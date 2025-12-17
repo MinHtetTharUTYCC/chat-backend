@@ -1,7 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    Injectable,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
-import * as bcrypt from "bcrypt";
+import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
 
@@ -10,38 +14,31 @@ export class AuthService {
     constructor(
         private jwt: JwtService,
         private readonly usersService: UsersService,
-    ) {
-        console.log("DEPENDEN:::", {
-            dep1: JwtService,
-            dep2: UsersService,
-        })
-    }
+    ) {}
 
     async getTokens(userId: string) {
         const accessToken = await this.jwt.signAsync(
             {
-                sub: userId
+                sub: userId,
             },
             {
                 secret: process.env.JWT_ACCESS_SECRET,
                 expiresIn: '3h',
-            }
+            },
         );
 
         const refreshToken = await this.jwt.signAsync(
             {
-                sub: userId
-
+                sub: userId,
             },
             {
                 secret: process.env.JWT_REFRESH_SECRET,
                 expiresIn: '7d',
-            }
+            },
         );
 
-        return { accessToken, refreshToken }
+        return { accessToken, refreshToken };
     }
-
 
     async login(loginDto: LoginDto) {
         //validate user
@@ -59,14 +56,15 @@ export class AuthService {
             ...tokens,
             user,
         };
-
     }
 
     async register(registerDto: RegisterDto) {
         // check existing
-        const userExists = await this.usersService.userExistsByMail(registerDto.email);
+        const userExists = await this.usersService.userExistsByMail(
+            registerDto.email,
+        );
         if (userExists) {
-            throw new BadRequestException("Email already taken")
+            throw new BadRequestException('Email already taken');
         }
 
         // hash password
@@ -85,23 +83,24 @@ export class AuthService {
         const hashedRT = await bcrypt.hash(tokens.refreshToken, 10);
         await this.usersService.updateRefreshToken(newUser.id, hashedRT);
 
-
         return {
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken,
-            user: newUser
-        }
+            user: newUser,
+        };
     }
 
     async refreshTokens(userId: string, oldRefreshToken: string) {
-
         const user = await this.usersService.getRefreshTokenOfUser(userId);
         if (!user || !user.refreshToken) {
             throw new ForbiddenException('Access Denied');
         }
 
-        const rtMatches = await bcrypt.compare(oldRefreshToken, user.refreshToken)
-        if (!rtMatches) throw new ForbiddenException("Invalid refresh token");
+        const rtMatches = await bcrypt.compare(
+            oldRefreshToken,
+            user.refreshToken,
+        );
+        if (!rtMatches) throw new ForbiddenException('Invalid refresh token');
 
         const newTokens = await this.getTokens(userId);
 
@@ -115,5 +114,3 @@ export class AuthService {
         await this.usersService.deleteRefreshToken(userId);
     }
 }
-
-

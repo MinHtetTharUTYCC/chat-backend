@@ -91,6 +91,20 @@
         ]
       }
     },
+    "/users": {
+      "get": {
+        "operationId": "UsersController_getAllUsers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/users/me": {
       "get": {
         "operationId": "UsersController_getMe",
@@ -117,6 +131,20 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/search": {
+      "get": {
+        "operationId": "UsersController_searchUsers",
+        "parameters": [],
         "responses": {
           "200": {
             "description": ""
@@ -215,13 +243,43 @@
             }
           },
           {
-            "name": "cursor",
+            "name": "prevCursor",
             "required": false,
             "in": "query",
-            "description": "Cursor for pagination (optional)",
+            "description": "Cursor for previous messages (optional)",
             "schema": {
-              "example": "cursor-string",
+              "example": "msg-id",
               "type": "string"
+            }
+          },
+          {
+            "name": "nextCursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor for next messages (optional)",
+            "schema": {
+              "example": "msg-id",
+              "type": "string"
+            }
+          },
+          {
+            "name": "aroundMessageId",
+            "required": false,
+            "in": "query",
+            "description": "Message id for look up (optional)",
+            "schema": {
+              "example": "msg-id",
+              "type": "string"
+            }
+          },
+          {
+            "name": "aroundDate",
+            "required": false,
+            "in": "query",
+            "description": "Date string for look up (optional)",
+            "schema": {
+              "example": "12345678",
+              "type": "number"
             }
           },
           {
