@@ -214,3 +214,5 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/MinHtetTharUTYCC/chat-backend?utm_source=oss&utm_medium=github&utm_campaign=MinHtetTharUTYCC%2Fchat-backend&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
