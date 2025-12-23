@@ -408,60 +408,78 @@ export class MessageService {
         messageId: string,
         content: string,
     ) {
-        const message = await this.databaseService.message.findFirst({
-            where: {
-                id: messageId,
-                senderId: userId,
-                chatId: chatId,
-            },
-            include: {
-                chat: {
-                    include: {
-                        participants: {
-                            select: { userId: true },
-                        },
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const [membership, message] = await Promise.all([
+                // Check membership first
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
                     },
-                },
-            },
+                    select: { id: true },
+                }),
+                // Find the message (only if user is sender)
+                tx.message.findFirst({
+                    where: {
+                        id: messageId,
+                        senderId: userId,
+                        chatId: chatId,
+                    },
+                    select: { id: true, content: true },
+                }),
+            ]);
+
+            if (!membership) {
+                throw new ForbiddenException(
+                    'You are not a member of this chat',
+                );
+            }
+            if (!message) {
+                throw new NotFoundException(
+                    'Message not found or you are not the sender',
+                );
+            }
+
+            const [updatedMessage, participants] = await Promise.all([
+                tx.message.update({
+                    where: { id: messageId },
+                    data: { content },
+                    select: {
+                        id: true,
+                        content: true,
+                        chatId: true,
+                        senderId: true,
+                        createdAt: true,
+                        updatedAt: true,
+                    },
+                }),
+                tx.participant.findMany({
+                    where: { chatId },
+                    select: { userId: true },
+                }),
+            ]);
+
+            return { updatedMessage, participants };
         });
-        if (!message)
-            throw new NotFoundException(
-                'Message not found or you are not the sender',
-            );
 
-        const usersToValidate = message.chat.participants.map(
-            (parti) => parti.userId,
-        );
-        if (!usersToValidate.includes(userId)) {
-            throw new ForbiddenException('You are not a member of this chat');
-        }
-
-        const updatedMessage = await this.databaseService.message.update({
-            where: {
-                id: messageId,
-            },
-            data: {
-                content: content,
-            },
+        this.chatGateway.server.to(`chat_${chatId}`).emit('message_updated', {
+            messageId,
+            content: result.updatedMessage.content,
         });
 
-        // update UI immediately
-        this.chatGateway.server
-            .to(`chat_${chatId}`)
-            .emit('message_updated', { messageId });
+        const cacheKeys = [
+            `chat:${chatId}:messages`,
+            ...result.participants.map((p) => `user:${p.userId}:chats`),
+        ];
 
-        // VALIDATE Cache
-        //1: to chat messages
-        await this.redisService.del(`chat:${chatId}:messages`);
-        //2: to all participants's chats list
-        // seems aggressive: but unsending is rare: so minimun DB call
-        // (instead of checking if message is last message and delete:_can introdude bugs)
-        const promises = usersToValidate.map((usrId) =>
-            this.redisService.del(`user:${usrId}:chats`),
+        cacheKeys.forEach((key) =>
+            this.redisService
+                .del(key)
+                .catch((err) =>
+                    console.error(`Error deleting cache key ${key}: ${err}`),
+                ),
         );
-        await Promise.all(promises);
 
-        return updatedMessage;
+        return result.updatedMessage;
     }
 
     async getPinnedMessages(
