@@ -9,18 +9,17 @@ import { PresenceModule } from 'src/presence/presence.module';
 import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    NotificationModule,
-    forwardRef(() => MessageModule),
-    forwardRef(() => PresenceModule),
-    JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET!,
-    })],
-  controllers: [ChatController],
-  providers: [ChatService, ChatGateway],
-  exports: [ChatService, ChatGateway]
+    imports: [
+        DatabaseModule,
+        NotificationModule,
+        forwardRef(() => MessageModule),
+        forwardRef(() => PresenceModule),
+        JwtModule.register({
+            secret: process.env.JWT_ACCESS_SECRET!,
+        }),
+    ],
+    controllers: [ChatController],
+    providers: [ChatService, ChatGateway],
+    exports: [ChatService, ChatGateway],
 })
-export class ChatModule { }
-
-
+export class ChatModule {}

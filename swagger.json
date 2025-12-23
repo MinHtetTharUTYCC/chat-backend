@@ -276,7 +276,7 @@
             "name": "aroundDate",
             "required": false,
             "in": "query",
-            "description": "Date string for look up (optional)",
+            "description": "Timestamp for look up (optional)",
             "schema": {
               "example": "12345678",
               "type": "number"

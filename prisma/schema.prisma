@@ -1,12 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   // output   = "../generated/prisma"
+  // Enable query optimization
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+  // Generate optimized binary
+  binaryTargets   = ["native"]
 }
 
 datasource db {
@@ -55,6 +53,8 @@ model Participant {
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@unique([userId, chatId])
+  @@index([chatId, userId])
+  @@index([userId])
 }
 
 model Message {
@@ -70,6 +70,10 @@ model Message {
   chat           Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
   sender         User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
   pinnedMessages PinnedMessage[]
+
+  @@index([chatId, id])
+  @@index([chatId, createdAt]) // For sorting by date
+  @@index([senderId])
 }
 
 model PinnedMessage {
@@ -85,6 +89,9 @@ model PinnedMessage {
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, messageId])
+  @@index([chatId, messageId])
+  @@index([pinnedByUserId])
+  @@index([messageId])
 }
 
 model Notification {
