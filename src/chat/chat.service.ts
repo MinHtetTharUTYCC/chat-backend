@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { ChatGateway } from './chat.gateway';
-import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
 import { MessageService } from 'src/message/message.service';
 import { RedisService } from 'src/redis/redis.service';
+import {NotificationType} from "generated/prisma"
 
 @Injectable()
 export class ChatService {
@@ -215,7 +215,7 @@ export class ChatService {
 
         await this.notificationService.createNotification(userId, newChat.id, {
             receiverId: otherUserId,
-            type: NotificationType.NEW_CHAT,
+            type: NotificationType .NEW_CHAT,
         });
 
         const socketPayload = {

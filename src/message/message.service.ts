@@ -4,8 +4,8 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { NotificationType } from 'generated/prisma';
+import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
 import { ChatGateway } from 'src/chat/chat.gateway';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
