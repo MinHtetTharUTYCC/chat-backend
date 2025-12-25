@@ -4,8 +4,8 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { NotificationType } from 'generated/prisma';
+import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
 import { ChatGateway } from 'src/chat/chat.gateway';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
@@ -24,35 +24,57 @@ export class MessageService {
         await this.verifyMembership(userId, chatId);
 
         const result = await this.databaseService.$transaction(async (tx) => {
-            const newMessage = await tx.message.create({
-                data: {
-                    content,
-                    chatId,
-                    senderId: userId,
-                },
-                include: {
-                    sender: {
-                        select: {
-                            id: true,
-                            username: true,
+            const [membership, participantIds] = await Promise.all([
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
+                    },
+                    select: {
+                        id: true,
+                    },
+                }),
+                tx.participant.findMany({
+                    where: { chatId },
+                    select: { userId: true },
+                }),
+            ]);
+
+            if (!membership) {
+                throw new ForbiddenException(
+                    'You are not a member of this chat',
+                );
+            }
+
+            const [newMessage, _] = await Promise.all([
+                tx.message.create({
+                    data: {
+                        content,
+                        chatId,
+                        senderId: userId,
+                    },
+                    select: {
+                        id: true,
+                        content: true,
+                        chatId: true,
+                        senderId: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        sender: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
                         },
                     },
-                },
-            });
+                }),
+                tx.chat.update({
+                    where: { id: chatId },
+                    data: { lastMessageAt: new Date() },
+                    select: { id: true },
+                }),
+            ]);
 
-            const updatedChat = await tx.chat.update({
-                where: { id: chatId },
-                data: { lastMessageAt: new Date() },
-                include: {
-                    participants: {
-                        select: {
-                            userId: true,
-                        },
-                    },
-                },
-            });
-
-            return { newMessage, updatedChat };
+            return { newMessage, participantIds };
         });
 
         // Broadcast via WS
@@ -60,14 +82,24 @@ export class MessageService {
             .to(`chat_${chatId}`)
             .emit('new_message', result.newMessage);
 
-        // INVALIDATE Cache
-        //del chats
-        const promises = result.updatedChat.participants.map((parti) =>
-            this.redisService.del(`user:${parti.userId}:chats`),
-        );
-        await Promise.all(promises);
+        // invalidate cache
+        const cacheKeys = [
+            `chat:${chatId}:messages`,
+            ...result.participantIds.map((p) => `user:${p.userId}:chats`),
+        ];
 
-        await this.redisService.del(`chat:${chatId}:messages`);
+        // fire and forgot
+        cacheKeys.forEach(
+            (key) =>
+                void this.redisService
+                    .del(key)
+                    .catch((err) =>
+                        console.error(
+                            `Cache invalidation error for key${key}:`,
+                            err,
+                        ),
+                    ),
+        );
 
         return result.newMessage;
     }
@@ -87,7 +119,7 @@ export class MessageService {
 
         const latestMessageKey = `chat:${chatId}:messages`;
 
-        const fetchingToUp = !!searchParams.nextCursor; //GETTTING OLDER
+        // const fetchingToUp = !!searchParams.nextCursor; //GETTTING OLDER
         const fetchingToBottom = !!searchParams.prevCursor; //GETTING NEWER
         const jumpingToMessage = !!searchParams.aroundMessageId; //PINNED OR SEARCH
         const jumpingToDate = !!searchParams.aroundDate;
@@ -256,6 +288,31 @@ export class MessageService {
             }
         }
 
+        //for pinned
+        const messageIds = messagesSorted.map((msg) => msg.id);
+        const pinned = await this.databaseService.pinnedMessage.findMany({
+            where: {
+                chatId,
+                messageId: { in: messageIds },
+            },
+            select: {
+                messageId: true,
+                pinnedByUserId: true,
+            },
+        });
+        const pinnedMap = new Map(
+            pinned.map((p) => [p.messageId, p.pinnedByUserId]),
+        );
+        messagesSorted = messagesSorted.map((msg) => {
+            const pinInfo = pinnedMap.get(msg.id);
+
+            return {
+                ...msg,
+                isPinned: !!pinInfo,
+                pinnedByUserId: pinInfo ?? null,
+            };
+        });
+
         const response = {
             messages: messagesSorted,
             meta: {
@@ -281,48 +338,63 @@ export class MessageService {
     }
 
     async deleteMessage(userId: string, chatId: string, messageId: string) {
-        // await this.verifyMembership(userId, chatId); //no-need(reduce db calls) anymore cuz, we need others participants(see DB call below)
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const [membership, deleteResult] = await Promise.all([
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
+                    },
+                    select: { id: true },
+                }),
+                // Try to delete the message (only works if user is the sender)
+                tx.message.deleteMany({
+                    where: {
+                        id: messageId,
+                        senderId: userId,
+                        chatId,
+                    },
+                }),
+            ]);
 
-        const participants = await this.databaseService.participant.findMany({
-            where: { chatId },
-            select: {
-                userId: true,
-            },
+            if (!membership)
+                throw new ForbiddenException(
+                    'You are not a member of this chat',
+                );
+
+            if (deleteResult.count === 0)
+                throw new NotFoundException(
+                    'Message not found or you are not the sender',
+                );
+
+            const participants = await tx.participant.findMany({
+                where: { chatId },
+                select: {
+                    userId: true,
+                },
+            });
+
+            return { participants };
         });
 
-        const usersToValidate = participants.map((parti) => parti.userId);
-        if (!usersToValidate.includes(userId)) {
-            throw new ForbiddenException('You are not a member of this chat');
-        }
-
-        const result = await this.databaseService.message.deleteMany({
-            where: {
-                id: messageId,
-                senderId: userId,
-                chatId,
-            },
-        });
-
-        if (result.count === 0)
-            throw new NotFoundException(
-                'Message not found or you are not the sender',
-            );
-
-        // update UI immediately
         this.chatGateway.server
             .to(`chat_${chatId}`)
             .emit('message_deleted', { messageId });
 
-        // INVALIDATE Cache
-        //1: to chat messages
-        await this.redisService.del(`chat:${chatId}:messages`);
-        //2: to all participants's chats list
-        // seems aggressive: but unsending is rare: so minimun DB call
-        // (instead of checking if message is last message and delete:_can introdude bugs)
-        const promises = usersToValidate.map((usrId) =>
-            this.redisService.del(`user:${usrId}:chats`),
+        const cacheKeys = [
+            `chat:${chatId}:messages`,
+            ...result.participants.map((p) => `user:${p.userId}:chats`),
+        ];
+
+        // fire and forgot
+        cacheKeys.forEach((key) =>
+            this.redisService
+                .del(key)
+                .catch((err) =>
+                    console.error(
+                        `Error deleting cache for key ${key}: ${err}`,
+                    ),
+                ),
         );
-        await Promise.all(promises);
 
         return {
             success: true,
@@ -336,60 +408,78 @@ export class MessageService {
         messageId: string,
         content: string,
     ) {
-        const message = await this.databaseService.message.findFirst({
-            where: {
-                id: messageId,
-                senderId: userId,
-                chatId: chatId,
-            },
-            include: {
-                chat: {
-                    include: {
-                        participants: {
-                            select: { userId: true },
-                        },
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const [membership, message] = await Promise.all([
+                // Check membership first
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
                     },
-                },
-            },
+                    select: { id: true },
+                }),
+                // Find the message (only if user is sender)
+                tx.message.findFirst({
+                    where: {
+                        id: messageId,
+                        senderId: userId,
+                        chatId: chatId,
+                    },
+                    select: { id: true, content: true },
+                }),
+            ]);
+
+            if (!membership) {
+                throw new ForbiddenException(
+                    'You are not a member of this chat',
+                );
+            }
+            if (!message) {
+                throw new NotFoundException(
+                    'Message not found or you are not the sender',
+                );
+            }
+
+            const [updatedMessage, participants] = await Promise.all([
+                tx.message.update({
+                    where: { id: messageId },
+                    data: { content },
+                    select: {
+                        id: true,
+                        content: true,
+                        chatId: true,
+                        senderId: true,
+                        createdAt: true,
+                        updatedAt: true,
+                    },
+                }),
+                tx.participant.findMany({
+                    where: { chatId },
+                    select: { userId: true },
+                }),
+            ]);
+
+            return { updatedMessage, participants };
         });
-        if (!message)
-            throw new NotFoundException(
-                'Message not found or you are not the sender',
-            );
 
-        const usersToValidate = message.chat.participants.map(
-            (parti) => parti.userId,
-        );
-        if (!usersToValidate.includes(userId)) {
-            throw new ForbiddenException('You are not a member of this chat');
-        }
-
-        const updatedMessage = await this.databaseService.message.update({
-            where: {
-                id: messageId,
-            },
-            data: {
-                content: content,
-            },
+        this.chatGateway.server.to(`chat_${chatId}`).emit('message_updated', {
+            messageId,
+            content: result.updatedMessage.content,
         });
 
-        // update UI immediately
-        this.chatGateway.server
-            .to(`chat_${chatId}`)
-            .emit('message_updated', { messageId });
+        const cacheKeys = [
+            `chat:${chatId}:messages`,
+            ...result.participants.map((p) => `user:${p.userId}:chats`),
+        ];
 
-        // VALIDATE Cache
-        //1: to chat messages
-        await this.redisService.del(`chat:${chatId}:messages`);
-        //2: to all participants's chats list
-        // seems aggressive: but unsending is rare: so minimun DB call
-        // (instead of checking if message is last message and delete:_can introdude bugs)
-        const promises = usersToValidate.map((usrId) =>
-            this.redisService.del(`user:${usrId}:chats`),
+        cacheKeys.forEach((key) =>
+            this.redisService
+                .del(key)
+                .catch((err) =>
+                    console.error(`Error deleting cache key ${key}: ${err}`),
+                ),
         );
-        await Promise.all(promises);
 
-        return updatedMessage;
+        return result.updatedMessage;
     }
 
     async getPinnedMessages(
@@ -398,8 +488,6 @@ export class MessageService {
         cursor?: string,
         limit: number = 20,
     ) {
-        await this.verifyMembership(userId, chatId);
-
         const cachedKey = `chat:${chatId}:messages:pinned`;
 
         if (!cursor) {
@@ -407,48 +495,66 @@ export class MessageService {
             const cachedResult = cached ? JSON.parse(cached) : null;
 
             if (cachedResult) {
-                console.log(
-                    'Returning pinned messages from cache...',
-                    cachedResult,
-                );
+                console.log('Returning pinned messages from cache...');
                 return cachedResult;
             }
         }
 
-        const pinnedMessages =
-            await this.databaseService.pinnedMessage.findMany({
-                where: {
-                    chatId,
-                },
-                skip: cursor ? 1 : 0,
-                cursor: cursor ? { id: cursor } : undefined,
-                take: limit,
-                orderBy: {
-                    createdAt: 'desc',
-                },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            username: true,
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const [membership, pinnedMessage] = await Promise.all([
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
+                    },
+                    select: { id: true },
+                }),
+                tx.pinnedMessage.findMany({
+                    where: {
+                        chatId,
+                    },
+                    skip: cursor ? 1 : 0,
+                    cursor: cursor ? { id: cursor } : undefined,
+                    take: limit,
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    select: {
+                        id: true,
+                        createdAt: true,
+                        pinnedByUserId: true,
+                        messageId: true,
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
+                        },
+                        message: {
+                            select: {
+                                id: true,
+                                content: true,
+                                senderId: true, // Might be useful
+                            },
                         },
                     },
-                    message: {
-                        select: {
-                            id: true,
-                            content: true,
-                        },
-                    },
-                },
-            });
+                }),
+            ]);
+
+            if (!membership) {
+                throw new ForbiddenException(
+                    'You are not a member of this chat',
+                );
+            }
+            return pinnedMessage;
+        });
 
         let nextCursor: string | null = null;
-        if (pinnedMessages.length === limit) {
-            nextCursor = pinnedMessages[pinnedMessages.length - 1].id;
+        if (result.length === limit) {
+            nextCursor = result[result.length - 1].id;
         }
 
         const response = {
-            pinnedMessages,
+            pinnedMessages: result,
             meta: {
                 nextCursor,
                 hasMore: nextCursor !== null,
@@ -456,149 +562,177 @@ export class MessageService {
         };
 
         // cache first page only
+        //fire and forgot - let it run in background
         if (!cursor) {
-            await this.redisService.set(
-                cachedKey,
-                JSON.stringify(response),
-                1800, //30 minutes
-            );
+            this.redisService
+                .set(
+                    cachedKey,
+                    JSON.stringify(response),
+                    1800, //30 minutes
+                )
+                .catch((err) => console.error('Cache Set Error', err));
         }
 
         return response;
     }
 
     async pinMessage(userId: string, chatId: string, messageId: string) {
-        await this.verifyMembership(userId, chatId);
+        const startTime = Date.now();
+        console.log('🔍 [PIN] Starting pinMessage');
 
-        //all members can pin every message
-        //verify message is in the chat
-        const message = await this.databaseService.message.findFirst({
-            where: {
-                id: messageId,
-                chatId,
-            },
-            select: {
-                id: true,
-                senderId: true,
-            },
-        });
+        // ✅ MEGA OPTIMIZATION: Combine ALL initial checks into ONE parallel batch
+        const t1 = Date.now();
+        const [membershipResult, message, chatInfo, pinnedByUser] =
+            await Promise.all([
+                // Check 1: Verify membership
+                this.databaseService.participant.findFirst({
+                    where: { chatId, userId },
+                    select: { userId: true },
+                }),
 
-        if (!message)
+                // Check 2: Verify message exists + get sender
+                this.databaseService.message.findFirst({
+                    where: { id: messageId, chatId },
+                    select: {
+                        id: true,
+                        senderId: true,
+                        sender: {
+                            select: { id: true, username: true },
+                        },
+                    },
+                }),
+
+                // Check 3: Get chat info + other participants
+                this.databaseService.chat.findUnique({
+                    where: { id: chatId },
+                    select: {
+                        isGroup: true,
+                        participants: {
+                            where: { userId: { not: userId } },
+                            select: { userId: true },
+                            take: 1,
+                        },
+                    },
+                }),
+
+                // Check 4: Get pinning user details
+                this.databaseService.user.findUnique({
+                    where: { id: userId },
+                    select: { id: true, username: true },
+                }),
+            ]);
+        console.log(`⏱️ [PIN] ALL parallel checks: ${Date.now() - t1}ms`);
+
+        // Validate results
+        if (!membershipResult) {
+            throw new ForbiddenException('User is not a member of this chat');
+        }
+        if (!message) {
             throw new NotFoundException('Message not found in the chat');
+        }
 
         try {
+            // ✅ Create pin (lean)
+            const t2 = Date.now();
             const pinMessage = await this.databaseService.pinnedMessage.create({
                 data: {
                     pinnedByUserId: userId,
                     chatId,
                     messageId,
                 },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            username: true,
-                        },
-                    },
-                    message: {
-                        include: {
-                            sender: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                },
-                            },
-                        },
-                    },
-                    chat: {
-                        select: {
-                            isGroup: true,
-                        },
-                    },
+                select: {
+                    id: true,
+                    pinnedByUserId: true,
+                    chatId: true,
+                    messageId: true,
                 },
             });
+            console.log(`⏱️ [PIN] pinnedMessage.create: ${Date.now() - t2}ms`);
 
-            //Noti DB
-            //case 1: in group-chat, notify to messageOwner(only if messagePinner is not messageOwner:_skip if pinner==owner)
-            //case 2: in one-to-one, ALWASYS notify to other-partcipant(neglect messageOwner)
-
+            if (!chatInfo) throw new NotFoundException('Chat not found');
+            // Build socket payload with already-fetched data
             const socketPayload = {
                 type: NotificationType.MESSAGE_PINNED,
-                data: pinMessage,
+                data: {
+                    ...pinMessage,
+                    user: pinnedByUser,
+                    message: {
+                        id: messageId,
+                        senderId: message.senderId,
+                        sender: message.sender, // Already fetched!
+                    },
+                    chat: {
+                        isGroup: chatInfo.isGroup,
+                    },
+                },
                 timestamp: new Date(),
             };
 
-            // case 1: group-chat
-            if (pinMessage.chat.isGroup) {
-                // Broadcast "State Update" to EVERYONE (Silent update)
-                // This ensures everyone sees the message get pinned in the UI immediately
+            // ✅ Fire socket events + notification in background
+            const t3 = Date.now();
+
+            if (chatInfo.isGroup) {
                 this.chatGateway.server
                     .to(`chat_${chatId}`)
                     .emit('pin_added', socketPayload);
-                console.log('EMitted pin_added');
 
                 if (message.senderId !== userId) {
-                    //For Noti popup
-                    this.chatGateway.server
-                        .to(`chat_${chatId}`)
-                        .emit('notification_new', socketPayload);
-                    console.log('EMitted notification_new');
+                    // this.chatGateway.server
+                    //     .to(`chat_${chatId}`)
+                    //     .emit('notification_new', socketPayload);
 
-                    // Save noti DB
-                    await this.notificationService.createNotification(
-                        userId,
-                        chatId,
-                        {
+                    // Background notification (fire-and-forget)
+                    this.notificationService
+                        .createNotification(userId, chatId, {
                             receiverId: message.senderId,
                             type: NotificationType.MESSAGE_PINNED,
                             pinnedId: pinMessage.id,
-                        },
-                    );
+                        })
+                        .catch((err) =>
+                            console.error('📬 Notification error:', err),
+                        );
                 }
             } else {
-                //case 2: 1-to-1 chat
-                const otherParticipant =
-                    await this.databaseService.participant.findFirst({
-                        where: {
-                            chatId,
-                            userId: { not: userId },
-                        },
-                        select: { userId: true },
-                    });
+                const otherParticipant = chatInfo.participants[0];
 
                 if (otherParticipant) {
-                    // update pin UI immediately
                     this.chatGateway.server
                         .to(`chat_${chatId}`)
                         .emit('pin_added', socketPayload);
-                    //For Noti popup
+
                     this.chatGateway.server
                         .to(`user_${otherParticipant.userId}`)
                         .emit('notification_new', socketPayload);
 
-                    // Save noti DB
-                    await this.notificationService.createNotification(
-                        userId,
-                        chatId,
-                        {
+                    // Background notification (fire-and-forget)
+                    this.notificationService
+                        .createNotification(userId, chatId, {
                             receiverId: otherParticipant.userId,
                             type: NotificationType.MESSAGE_PINNED,
                             pinnedId: pinMessage.id,
-                        },
-                    );
+                        })
+                        .catch((err) =>
+                            console.error('📬 Notification error:', err),
+                        );
                 }
             }
+            console.log(`⏱️ [PIN] Socket events: ${Date.now() - t3}ms`);
 
-            // INVALIDATE Cache
-            const keysToDelete = [
-                `chat:${chatId}:messages`,
-                `chat:${chatId}:messages:pinned`, // i have pinned message (api end point)
-            ];
-            await this.redisService.del(keysToDelete[0]);
-            await this.redisService.del(keysToDelete[1]);
+            // ✅ Clear cache (parallel if possible)
+            const t4 = Date.now();
+            await Promise.all([
+                this.redisService.del(`chat:${chatId}:messages`),
+                this.redisService.del(`chat:${chatId}:messages:pinned`),
+            ]);
 
-            return pinMessage;
+            console.log(`⏱️ [PIN] Redis del: ${Date.now() - t4}ms`);
+
+            const totalTime = Date.now() - startTime;
+            console.log(`✅ [PIN] TOTAL TIME: ${totalTime}ms`);
+
+            return { success: true };
         } catch (error) {
+            console.log(`❌ [PIN] Error after ${Date.now() - startTime}ms`);
             if (error instanceof PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
                     throw new ConflictException('Message is already pinned');
@@ -609,52 +743,84 @@ export class MessageService {
     }
 
     async unpinMessage(userId: string, chatId: string, messageId: string) {
-        await this.verifyMembership(userId, chatId);
+        const startTime = Date.now();
+        console.log('[UNPIN] Starting unpinMessage');
 
-        //find pinnedMessage
-        const pinnedRecord = await this.databaseService.pinnedMessage.findFirst(
-            {
-                where: {
-                    chatId,
-                    messageId,
-                },
-                include: {
-                    message: {
-                        select: { senderId: true },
+        const t1 = Date.now();
+
+        const result = await this.databaseService.$transaction(async (tx) => {
+            //run in parallel
+            const [membership, pinnedRecord] = await Promise.all([
+                tx.participant.findUnique({
+                    where: {
+                        userId_chatId: { userId, chatId },
                     },
+                    select: { id: true },
+                }),
+                tx.pinnedMessage.findFirst({
+                    where: { chatId, messageId },
+                    select: {
+                        id: true,
+                        pinnedByUserId: true,
+                        message: {
+                            select: {
+                                senderId: true,
+                            },
+                        },
+                    },
+                }),
+            ]);
+            if (!membership)
+                throw new ForbiddenException(
+                    'You are not a participant of this chat',
+                );
+
+            if (!pinnedRecord)
+                throw new NotFoundException('This message is not pinned');
+
+            // allow only to pin-creator or message-owner
+            const isPinCreator = pinnedRecord.pinnedByUserId === userId;
+            const isMessageOwner = pinnedRecord.message.senderId === userId;
+
+            if (!isPinCreator && !isMessageOwner)
+                throw new ForbiddenException(
+                    'You can only upin your own pins or your own messages',
+                );
+
+            await tx.pinnedMessage.delete({
+                where: {
+                    id: pinnedRecord.id,
                 },
-            },
-        );
+            });
 
-        if (!pinnedRecord)
-            throw new NotFoundException('This message is not pinned');
-
-        //permissions (allow only to pin-creator or message-owner)
-        const isPinCreator = pinnedRecord.pinnedByUserId === userId;
-        const isMessageOwner = pinnedRecord.message.senderId === userId;
-
-        if (!isPinCreator && !isMessageOwner)
-            throw new ForbiddenException(
-                'You can only upin your own pins or your own messages',
-            );
-
-        await this.databaseService.pinnedMessage.delete({
-            where: {
-                id: pinnedRecord.id,
-            },
+            return {
+                success: true,
+            };
         });
+        console.log(`[UNPIN] Transaction (all DB ops): ${Date.now() - t1}ms`);
 
-        this.chatGateway.server
-            .to(`chat_${chatId}`)
-            .emit('pin_removed', { messageId });
+        // ✅ Emit socket event + clear cache in parallel (non-blocking)
+        const t2 = Date.now();
+        await Promise.all([
+            // socket emit(sync, fast)
+            Promise.resolve(
+                this.chatGateway.server
+                    .to(`chat_${chatId}`)
+                    .emit('pin_removed', { messageId }),
+            ),
+            // clear cache
+            this.redisService.del(`chat:${chatId}:messages`),
+            this.redisService.del(`chat:${chatId}:messages:pinned`),
+        ]);
+        console.log(`[UNPIN] socket + cache: ${Date.now() - t2}ms`);
 
-        return {
-            success: true,
-            message: 'Successfully unpineed message',
-        };
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ [UNPIN] TOTAL TIME: ${totalTime}ms`);
+
+        return result;
     }
 
-    // many functions use this
+    // resuable function: to be able for many others functions to call this
     async verifyMembership(userId: string, chatId: string) {
         const membership = await this.databaseService.participant.findUnique({
             where: {

@@ -67,7 +67,7 @@ export class ChatController {
     //         query.limitAfter,
     //     );
     // }
-    
+
     @Get('/:chatId/messages')
     async getMessages(
         @Req() req,

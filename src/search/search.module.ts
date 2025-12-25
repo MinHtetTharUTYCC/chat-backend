@@ -4,8 +4,8 @@ import { SearchService } from './search.service';
 import { DatabaseModule } from 'src/database/database.module';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [SearchController],
-  providers: [SearchService]
+    imports: [DatabaseModule],
+    controllers: [SearchController],
+    providers: [SearchService],
 })
-export class SearchModule { }
+export class SearchModule {}

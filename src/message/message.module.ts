@@ -7,7 +7,6 @@ import { NotificationModule } from 'src/notification/notification.module';
 @Module({
     imports: [DatabaseModule, NotificationModule, forwardRef(() => ChatModule)],
     providers: [MessageService],
-    exports: [MessageService]
-
+    exports: [MessageService],
 })
-export class MessageModule { }
+export class MessageModule {}

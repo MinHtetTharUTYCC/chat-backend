@@ -9,7 +9,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
 
 describe('ChatService', () => {

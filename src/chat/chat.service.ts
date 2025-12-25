@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { ChatGateway } from './chat.gateway';
-import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
 import { MessageService } from 'src/message/message.service';
 import { RedisService } from 'src/redis/redis.service';
+import { NotificationType } from 'generated/prisma';
 
 @Injectable()
 export class ChatService {
@@ -359,7 +359,7 @@ export class ChatService {
 
     async createGroupChat(userId: string, title: string, userIds: string[]) {
         // Set: for removing dupblicates
-        let uniqueUserIds = new Set<string>([...userIds, userId]);
+        const uniqueUserIds = new Set<string>([...userIds, userId]);
         const usersToParticipate = Array.from(uniqueUserIds).map((id) => ({
             userId: id,
         }));
