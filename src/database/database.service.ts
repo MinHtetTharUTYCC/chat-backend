@@ -8,13 +8,16 @@ export class DatabaseService
     extends PrismaClient
     implements OnModuleInit, OnModuleDestroy
 {
+    private pool = new pg.Pool();
+
     constructor() {
         // instantiate the driver instance
         const connectionString = process.env.DATABASE_URL!;
-        const pool = new pg.Pool({connectionString})
+        const pool = new pg.Pool({ connectionString });
         const adapter = new PrismaPg(pool);
 
-        super({adapter});
+        super({ adapter });
+        this.pool = pool;
     }
     async onModuleInit() {
         await this.$connect();
@@ -22,5 +25,6 @@ export class DatabaseService
 
     async onModuleDestroy() {
         await this.$disconnect();
+        await this.pool.end();
     }
 }

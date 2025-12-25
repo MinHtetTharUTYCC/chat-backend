@@ -89,15 +89,16 @@ export class MessageService {
         ];
 
         // fire and forgot
-        cacheKeys.forEach((key) =>
-            this.redisService
-                .del(key)
-                .catch((err) =>
-                    console.error(
-                        `Cache invalidation error for key${key}:`,
-                        err,
+        cacheKeys.forEach(
+            (key) =>
+                void this.redisService
+                    .del(key)
+                    .catch((err) =>
+                        console.error(
+                            `Cache invalidation error for key${key}:`,
+                            err,
+                        ),
                     ),
-                ),
         );
 
         return result.newMessage;
@@ -118,7 +119,7 @@ export class MessageService {
 
         const latestMessageKey = `chat:${chatId}:messages`;
 
-        const fetchingToUp = !!searchParams.nextCursor; //GETTTING OLDER
+        // const fetchingToUp = !!searchParams.nextCursor; //GETTTING OLDER
         const fetchingToBottom = !!searchParams.prevCursor; //GETTING NEWER
         const jumpingToMessage = !!searchParams.aroundMessageId; //PINNED OR SEARCH
         const jumpingToDate = !!searchParams.aroundDate;
@@ -365,13 +366,12 @@ export class MessageService {
                     'Message not found or you are not the sender',
                 );
 
-            const participants =
-                await this.databaseService.participant.findMany({
-                    where: { chatId },
-                    select: {
-                        userId: true,
-                    },
-                });
+            const participants = await tx.participant.findMany({
+                where: { chatId },
+                select: {
+                    userId: true,
+                },
+            });
 
             return { participants };
         });
@@ -381,14 +381,14 @@ export class MessageService {
             .emit('message_deleted', { messageId });
 
         const cacheKeys = [
-            `chats:${chatId}:messages`,
+            `chat:${chatId}:messages`,
             ...result.participants.map((p) => `user:${p.userId}:chats`),
         ];
 
         // fire and forgot
         cacheKeys.forEach((key) =>
             this.redisService
-                .del(`chat:${chatId}:messages`)
+                .del(key)
                 .catch((err) =>
                     console.error(
                         `Error deleting cache for key ${key}: ${err}`,
@@ -787,7 +787,7 @@ export class MessageService {
                     'You can only upin your own pins or your own messages',
                 );
 
-            await this.databaseService.pinnedMessage.delete({
+            await tx.pinnedMessage.delete({
                 where: {
                     id: pinnedRecord.id,
                 },
