@@ -5,7 +5,7 @@ import { DatabaseService } from 'src/database/database.service';
 export class SearchService {
     constructor(private readonly databaseService: DatabaseService) {}
 
-    async searchGolbal(userId: string, query: string) {
+    async searchChats(userId: string, query: string) {
         const [users, groups] = await Promise.all([
             //users
             this.databaseService.user.findMany({

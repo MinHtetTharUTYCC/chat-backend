@@ -11,11 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly databaseService: DatabaseService) {
-        console.log('DEPENDEN:::', {
-            dep1: DatabaseService,
-        });
-    }
+    constructor(private readonly databaseService: DatabaseService) {}
 
     async userExistsByMail(email: string): Promise<boolean> {
         const user = await this.databaseService.user.findUnique({
@@ -68,7 +64,7 @@ export class UsersService {
     async getRefreshTokenOfUser(userId: string) {
         const user = await this.databaseService.user.findUnique({
             where: { id: userId },
-            select: { id: true, refreshToken: true },
+            select: { id: true, username: true, refreshToken: true },
         });
         if (!user) throw new NotFoundException('User not found');
         return user;

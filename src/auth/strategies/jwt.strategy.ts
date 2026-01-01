@@ -18,6 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // The decoded token payload is passed as the first argument
     validate(payload: JwtPayload): RequestUser {
         // this returned value is attached to the Request object as req.user
-        return payload;
+        return { sub: payload.sub, username: payload.username };
     }
 }

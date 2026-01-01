@@ -27,12 +27,19 @@ export class AuthService {
             username,
         };
 
+        const accessSecret = process.env.JWT_ACCESS_SECRET;
+        const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+        if (!accessSecret || !refreshSecret) {
+            throw new Error('JWT secrets not configured');
+        }
+
         const accessToken = await this.jwt.signAsync(payload, {
-            secret: process.env.JWT_ACCESS_SECRET,
+            secret: accessSecret,
             expiresIn: '3h',
         });
         const refreshToken = await this.jwt.signAsync(payload, {
-            secret: process.env.JWT_REFRESH_SECRET,
+            secret: refreshSecret,
             expiresIn: '7d',
         });
 
@@ -89,11 +96,7 @@ export class AuthService {
         };
     }
 
-    async refreshTokens(
-        userId: string,
-        username: string,
-        oldRefreshToken: string,
-    ) {
+    async refreshTokens(userId: string, oldRefreshToken: string) {
         const user = await this.usersService.getRefreshTokenOfUser(userId);
         if (!user || !user.refreshToken) {
             throw new ForbiddenException('Access Denied');
@@ -105,7 +108,7 @@ export class AuthService {
         );
         if (!rtMatches) throw new ForbiddenException('Invalid refresh token');
 
-        const newTokens = await this.getTokens(userId, username);
+        const newTokens = await this.getTokens(userId, user.username);
 
         const hashed = await bcrypt.hash(newTokens.refreshToken, 10);
         await this.usersService.updateRefreshToken(userId, hashed);

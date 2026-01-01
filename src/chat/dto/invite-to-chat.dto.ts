@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsString } from 'class-validator';
+import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
+    IsNotEmpty,
+    IsString,
+} from 'class-validator';
 
 export class InviteToChatDto {
     @ApiProperty({
@@ -9,6 +15,8 @@ export class InviteToChatDto {
     })
     @IsArray()
     @IsString({ each: true })
+    @IsNotEmpty({ each: true })
     @ArrayMinSize(1)
+    @ArrayMaxSize(100)
     userIds: string[];
 }

@@ -32,9 +32,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         //log the error
         if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
-            this.logger.error(exception);
+            const errorMessage =
+                exception instanceof Error
+                    ? exception.message
+                    : 'Unknown error';
+            const stack =
+                exception instanceof Error ? exception.stack : undefined;
+            this.logger.error(errorMessage, stack);
         }
-
         response.status(status).json({
             statusCode: status,
             timestamp: new Date().toISOString(),

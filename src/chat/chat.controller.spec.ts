@@ -67,7 +67,7 @@ describe('ChatController', () => {
     });
 
     describe('getAllChats', () => {
-        it('shuld return a list of chats for the user', async () => {
+        it('should return a list of chats for the user', async () => {
             const mockResult = [{ id: '1' }, { id: '2' }];
             mockChatService.getAllChats.mockResolvedValue(mockResult);
 
@@ -81,7 +81,7 @@ describe('ChatController', () => {
     });
 
     describe('viewChat', () => {
-        it('shuld return a specific chat view', async () => {
+        it('should return a specific chat view', async () => {
             const chatId = 'chat-id-1';
             const mockResult = {
                 id: chatId,
@@ -103,7 +103,7 @@ describe('ChatController', () => {
     });
 
     describe('startChat', () => {
-        it('shuld start a chat with another user', async () => {
+        it('should start a chat with another user', async () => {
             const dto: StartChatDto = { otherUserId: 'other-user-id' };
             const mockResult = { id: 'new-chat-id' };
             mockChatService.startChat.mockResolvedValue(mockResult);
@@ -118,7 +118,7 @@ describe('ChatController', () => {
     });
 
     describe('getMessages', () => {
-        it('shuld return a list of messages', async () => {
+        it('should return a list of messages', async () => {
             const chatIdFromParams = 'chat-id-1';
             const dto: PaginationDto = {
                 cursor: 'latest-loaded-msg-id',
@@ -126,7 +126,7 @@ describe('ChatController', () => {
             };
             const mockResult = [
                 { id: 'msg-1', content: 'content-1' },
-                { id: 'msg-2', content: 'conent-2' },
+                { id: 'msg-2', content: 'content-2' },
             ];
             mockMessageService.getMessages.mockResolvedValue(mockResult);
 
@@ -172,7 +172,7 @@ describe('ChatController', () => {
             const messageId = 'msg-id-1';
             const mockResult = {
                 success: true,
-                message: 'Successfully delete message',
+                message: 'Successfully deleted message',
             };
             mockMessageService.deleteMessage.mockResolvedValue(mockResult);
 
@@ -261,148 +261,142 @@ describe('ChatController', () => {
             );
             expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('unpin Message', () => {
-            it('should successfully delete pinned message', async () => {
-                const chatId = 'chat-id-1';
-                const messageId = 'msg-id-1';
-                const mockResult = {
-                    success: true,
-                    message: 'Successfully unpineed message',
-                };
-                mockMessageService.unpinMessage.mockResolvedValue(mockResult);
+    describe('unpin Message', () => {
+        it('should successfully delete pinned message', async () => {
+            const chatId = 'chat-id-1';
+            const messageId = 'msg-id-1';
+            const mockResult = {
+                success: true,
+                message: 'Successfully unpinned message',
+            };
+            mockMessageService.unpinMessage.mockResolvedValue(mockResult);
 
-                const result = await controller.unpinMessage(
-                    mockRequestUser,
-                    chatId,
-                    messageId,
-                );
-                expect(messageService.unpinMessage).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    chatId,
-                    messageId,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.unpinMessage(
+                mockRequestUser,
+                chatId,
+                messageId,
+            );
+            expect(messageService.unpinMessage).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                chatId,
+                messageId,
+            );
+            expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('update chat title', () => {
-            it('should successfully update title of the chat', async () => {
-                const chatId = 'chat-id-1';
-                const dto: UpdateChatTitleDto = { title: 'New Title' };
-                const mockResult = {
-                    success: true,
-                    chatId: chatId,
-                    title: 'New Title',
-                };
-                mockChatService.updateChatTitle.mockResolvedValue(mockResult);
+    describe('update chat title', () => {
+        it('should successfully update title of the chat', async () => {
+            const chatId = 'chat-id-1';
+            const dto: UpdateChatTitleDto = { title: 'New Title' };
+            const mockResult = {
+                success: true,
+                chatId: chatId,
+                title: 'New Title',
+            };
+            mockChatService.updateChatTitle.mockResolvedValue(mockResult);
 
-                const result = await controller.updateChatTitle(
-                    mockRequestUser,
-                    chatId,
-                    dto,
-                );
-                expect(chatService.updateChatTitle).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    chatId,
-                    dto.title,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.updateChatTitle(
+                mockRequestUser,
+                chatId,
+                dto,
+            );
+            expect(chatService.updateChatTitle).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                chatId,
+                dto.title,
+            );
+            expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('create group chat', () => {
-            it('should successfully create a new group chat', async () => {
-                const dto: CreateGroupChatDto = {
-                    title: 'New Group',
-                    userIds: ['user-1', 'user-2'],
-                };
-                const mockResult = {
-                    id: 'new-chat-id',
-                    title: 'Group',
-                    messages: [],
-                    participants: [],
-                };
-                mockChatService.createGroupChat.mockResolvedValue(mockResult);
+    describe('create group chat', () => {
+        it('should successfully create a new group chat', async () => {
+            const dto: CreateGroupChatDto = {
+                title: 'New Group',
+                userIds: ['user-1', 'user-2'],
+            };
+            const mockResult = {
+                id: 'new-chat-id',
+                title: 'Group',
+                messages: [],
+                participants: [],
+            };
+            mockChatService.createGroupChat.mockResolvedValue(mockResult);
 
-                const result = await controller.createGroupChat(
-                    mockRequestUser,
-                    dto,
-                );
-                expect(chatService.createGroupChat).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    dto.title,
-                    dto.userIds,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.createGroupChat(
+                mockRequestUser,
+                dto,
+            );
+            expect(chatService.createGroupChat).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                dto.title,
+                dto.userIds,
+            );
+            expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('add others to group chat', () => {
-            it('should added others as chat participants', async () => {
-                const chatId = 'chat-id-1';
-                const dto: AddToChatDto = { userIds: ['user-2', 'user-3'] };
-                const mockResult = {
-                    id: chatId,
-                    messages: [],
-                    participants: [],
-                };
-                mockChatService.addToGroupChat.mockResolvedValue(mockResult);
+    describe('add others to group chat', () => {
+        it('should add others as chat participants', async () => {
+            const chatId = 'chat-id-1';
+            const dto: AddToChatDto = { userIds: ['user-2', 'user-3'] };
+            const mockResult = {
+                id: chatId,
+                messages: [],
+                participants: [],
+            };
+            mockChatService.addToGroupChat.mockResolvedValue(mockResult);
 
-                const result = await controller.addToGroupChat(
-                    mockRequestUser,
-                    chatId,
-                    dto,
-                );
-                expect(chatService.addToGroupChat).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    chatId,
-                    dto.userIds,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.addToGroupChat(
+                mockRequestUser,
+                chatId,
+                dto,
+            );
+            expect(chatService.addToGroupChat).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                chatId,
+                dto.userIds,
+            );
+            expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('join group', () => {
-            it('should successfully joined the group chat', async () => {
-                const chatId = 'chat-id-1';
-                const mockResult = {
-                    success: true,
-                    message: 'Successfully joined the group chat',
-                };
-                mockChatService.joinGroup.mockResolvedValue(mockResult);
+    describe('join group', () => {
+        it('should successfully join the group chat', async () => {
+            const chatId = 'chat-id-1';
+            const mockResult = {
+                success: true,
+                message: 'Successfully joined the group chat',
+            };
+            mockChatService.joinGroup.mockResolvedValue(mockResult);
 
-                const result = await controller.joinGroup(
-                    mockRequestUser,
-                    chatId,
-                );
-                expect(chatService.joinGroup).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    chatId,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.joinGroup(mockRequestUser, chatId);
+            expect(chatService.joinGroup).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                chatId,
+            );
+            expect(result).toEqual(mockResult);
         });
+    });
 
-        describe('leave group', () => {
-            it('should successfully leaved the group chat', async () => {
-                const chatId = 'chat-id-1';
-                const mockResult = {
-                    success: true,
-                    message: 'Successfully leaved the group chat',
-                };
-                mockChatService.leaveGroup.mockResolvedValue(mockResult);
+    describe('leave group', () => {
+        it('should successfully leave the group chat', async () => {
+            const chatId = 'chat-id-1';
+            const mockResult = {
+                success: true,
+                message: 'Successfully leaved the group chat',
+            };
+            mockChatService.leaveGroup.mockResolvedValue(mockResult);
 
-                const result = await controller.leaveGroup(
-                    mockRequestUser,
-                    chatId,
-                );
-                expect(chatService.leaveGroup).toHaveBeenCalledWith(
-                    mockRequestUser.sub,
-                    chatId,
-                );
-                expect(result).toEqual(mockResult);
-            });
+            const result = await controller.leaveGroup(mockRequestUser, chatId);
+            expect(chatService.leaveGroup).toHaveBeenCalledWith(
+                mockRequestUser.sub,
+                chatId,
+            );
+            expect(result).toEqual(mockResult);
         });
     });
 });

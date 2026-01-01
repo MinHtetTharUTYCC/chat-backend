@@ -136,8 +136,8 @@ async function generateDmKeysForAllDM() {
             });
 
             updatedCount++;
-            // Log progress every 1 item
-            if (updatedCount % 1 === 0) process.stdout.write('.');
+            updatedCount++;
+            process.stdout.write('.');
         }
     } catch (error) {
         console.error('❌ Seed dmKeys failed:', error);

@@ -72,12 +72,12 @@ export class AuthController {
         @Req() req,
         @Res({ passthrough: true }) res: express.Response,
     ) {
-        const { sub: userId, username } = req.user;
+        const { sub: userId } = req.user;
         const oldRT = req.user.refreshToken;
 
         // Generate new tokens
         const { accessToken, refreshToken } =
-            await this.authService.refreshTokens(userId, username, oldRT);
+            await this.authService.refreshTokens(userId, oldRT);
 
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,

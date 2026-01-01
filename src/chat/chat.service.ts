@@ -210,6 +210,7 @@ export class ChatService {
             try {
                 const newChat = await tx.chat.create({
                     data: {
+                        dmKey,
                         isGroup: false,
                         participants: {
                             create: [
@@ -220,13 +221,6 @@ export class ChatService {
                     },
                     include: chatItemInclude,
                 });
-                this.runNewChatSideEffects(me, otherUserId, newChat.id).catch(
-                    (error) =>
-                        console.error(
-                            'Background task for starting new chat failed:',
-                            error,
-                        ),
-                );
                 return { chat: newChat, isNew: true };
             } catch (error) {
                 // P2002: Unique constraint failed on the field: `dmKey`
@@ -261,6 +255,16 @@ export class ChatService {
                 throw error;
             }
         });
+
+        if (result.isNew) {
+            this.runNewChatSideEffects(me, otherUserId, result.chat.id).catch(
+                (error) =>
+                    console.error(
+                        'Background task for starting new chat failed:',
+                        error,
+                    ),
+            );
+        }
 
         return { oldChatExists: !result.isNew, chat: result.chat };
     }
@@ -496,7 +500,7 @@ export class ChatService {
 
                 const nofifyJob = Promise.all(
                     Array.from(uniqueUserIds).map((id) => {
-                        this.notificationService.createNotification(
+                        return this.notificationService.createNotification(
                             me.sub,
                             groupChat.id,
                             {
@@ -807,13 +811,6 @@ export class ChatService {
                     ),
                 );
             } catch (error) {
-                // Handle "User does not exist" (Foreign Key Constraint Fails)
-                if (error.code === 'P2003') {
-                    // Prisma FK violation code
-                    throw new BadRequestException(
-                        'One or more user do not exist',
-                    );
-                }
                 console.error(
                     `Background task failed for inviting members to chat: ${chatId}:`,
                     error,

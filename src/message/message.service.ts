@@ -462,7 +462,7 @@ export class MessageService {
             content: result.updatedMessage.content,
             actor: {
                 id: me.sub,
-                usename: me.username,
+                username: me.username,
             },
         };
 
@@ -787,7 +787,7 @@ export class MessageService {
 
             if (!isPinCreator && !isMessageOwner)
                 throw new ForbiddenException(
-                    'You can only upin your own pins or your own messages',
+                    'You can only unpin your own pins or your own messages',
                 );
 
             await tx.pinnedMessage.delete({

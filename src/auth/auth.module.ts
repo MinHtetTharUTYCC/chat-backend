@@ -14,7 +14,7 @@ import { RefreshStrategy } from './strategies/refresh.strategy';
     imports: [
         ConfigModule,
         JwtModule.register({
-            //Can keep empty: manipuate in insides
+            //Can keep empty: manipulate in insides
             // secret: process.env.JWT_ACCESS_SECRET,
             // signOptions: { expiresIn: '15m' }, //short-lived access token
         }),

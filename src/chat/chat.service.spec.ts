@@ -11,8 +11,7 @@ import {
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
-import { create } from 'domain';
-
+import { RequestUser } from 'src/auth/interfaces/request-user.interface';
 describe('ChatService', () => {
     let service: ChatService;
     let databaseService: DatabaseService;
@@ -192,7 +191,7 @@ describe('ChatService', () => {
         beforeEach(() => {
             //Isolate the internal call to getChat
             getChatSpy = jest
-                .spyOn(service, 'getChat')
+                .spyOn(service, 'viewChat')
                 .mockResolvedValue(mockResult);
         });
 
@@ -288,7 +287,7 @@ describe('ChatService', () => {
             mockRedisService.get.mockResolvedValue(mockResult);
 
             //ACT
-            const result = await service.getChat(chatId);
+            const result = await service.viewChat('user-id', chatId);
 
             //ASSERT
             expect(redisService.get).toHaveBeenCalledWith(cachedKey);
@@ -304,7 +303,7 @@ describe('ChatService', () => {
             mockDatabaseService.chat.findUnique.mockResolvedValue(null);
 
             // ASSERT
-            await expect(service.getChat(chatId)).rejects.toThrow(
+            await expect(service.viewChat('user-id', chatId)).rejects.toThrow(
                 NotFoundException,
             );
             expect(redisService.set).not.toHaveBeenCalled();
@@ -316,7 +315,7 @@ describe('ChatService', () => {
             mockDatabaseService.chat.findUnique.mockResolvedValue(mockResult);
 
             // ACT
-            const result = await service.getChat(chatId);
+            const result = await service.viewChat('user-id', chatId);
 
             // ASSERT
             expect(mockRedisService.get).toHaveBeenCalled();
@@ -332,6 +331,8 @@ describe('ChatService', () => {
 
     describe('startChat', () => {
         const userId = 'my-initiator-id';
+        const username = 'my-username';
+        const me: RequestUser = { sub: userId, username };
         const otherUserId = 'other-recipient-id';
         const existingChatId = 'existing-chat-dm-1';
 
@@ -351,7 +352,7 @@ describe('ChatService', () => {
         // Path 1: Fail- User tries to chat with themselves
         it('should throw BadReqeustException if user ids are the same', async () => {
             // ACT and ASSERT
-            await expect(service.startChat(userId, userId)).rejects.toThrow(
+            await expect(service.startChat(me, userId)).rejects.toThrow(
                 BadRequestException,
             );
             expect(databaseService.user.findUnique).not.toHaveBeenCalled();
@@ -363,9 +364,9 @@ describe('ChatService', () => {
             mockDatabaseService.user.findUnique.mockResolvedValue(null);
 
             //ACT && ASSERT
-            await expect(
-                service.startChat(userId, otherUserId),
-            ).rejects.toThrow(NotFoundException);
+            await expect(service.startChat(me, otherUserId)).rejects.toThrow(
+                NotFoundException,
+            );
             expect(databaseService.user.findUnique).toHaveBeenCalledWith({
                 where: { id: otherUserId },
                 select: { id: true },
@@ -384,7 +385,7 @@ describe('ChatService', () => {
             );
 
             //ACT
-            const result = await service.startChat(userId, otherUserId);
+            const result = await service.startChat(me, otherUserId);
 
             //ASSERT
             expect(databaseService.user.findUnique).toHaveBeenCalled();
@@ -406,7 +407,7 @@ describe('ChatService', () => {
             mockDatabaseService.chat.create.mockResolvedValue(mockNewChat);
 
             // ACT
-            const result = await service.startChat(userId, otherUserId);
+            const result = await service.startChat(me, otherUserId);
 
             // ASSERT
             expect(databaseService.chat.findFirst).toHaveBeenCalled();

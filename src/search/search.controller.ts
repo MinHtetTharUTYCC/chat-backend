@@ -17,8 +17,11 @@ export class SearchController {
     constructor(private readonly searchService: SearchService) {}
 
     @Get('/')
-    async searchGlobal(@Req() req, @Query(ValidationPipe) dto: SearchQueryDto) {
-        return this.searchService.searchGolbal(req.user.sub, dto.q);
+    async searchAllUsers(
+        @Req() req,
+        @Query(ValidationPipe) dto: SearchQueryDto,
+    ) {
+        return this.searchService.searchChats(req.user.sub, dto.q);
     }
 
     @Get('/chats/:chatId')
