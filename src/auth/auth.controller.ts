@@ -1,4 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    HttpCode,
+    HttpStatus,
+    Post,
+    Req,
+    Res,
+    UseGuards,
+    ValidationPipe,
+} from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import express from 'express';
@@ -8,90 +18,96 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-
-    constructor(private readonly authService: AuthService) { }
+    constructor(private readonly authService: AuthService) {}
 
     @HttpCode(HttpStatus.OK)
     @Post('/login')
-    async login(@Body(ValidationPipe) dto: LoginDto, @Res({ passthrough: true }) res: express.Response) {
-        const { accessToken, refreshToken, user } = await this.authService.login(dto);
+    async login(
+        @Body(ValidationPipe) dto: LoginDto,
+        @Res({ passthrough: true }) res: express.Response,
+    ) {
+        const { accessToken, refreshToken, user } =
+            await this.authService.login(dto);
 
         // set refres tokens only in httpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: false,
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            path: '/auth/refresh',
+            path: '/',
         });
 
         return {
             accessToken,
-            user
+            user,
         };
     }
 
-
     @HttpCode(HttpStatus.CREATED)
     @Post('/register')
-    async register(@Body(ValidationPipe) dto: RegisterDto, @Res({ passthrough: true }) res: express.Response) {
-        console.log("REGISTER>>>>>.")
-        const { accessToken, refreshToken, user } = await this.authService.register(dto);
+    async register(
+        @Body(ValidationPipe) dto: RegisterDto,
+        @Res({ passthrough: true }) res: express.Response,
+    ) {
+        const { accessToken, refreshToken, user } =
+            await this.authService.register(dto);
 
         // set refresh tokens only in HttpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: false,
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            path: '/auth/refresh',
+            path: '/',
         });
-
 
         return {
             accessToken,
-            user
+            user,
         };
-
-    };
+    }
 
     @Post('/refresh')
     @UseGuards(JwtRefreshGuard)
-    async refresh(@Req() req, @Res({ passthrough: true }) res: express.Response) {
-        const userId = req.user.sub;
+    async refresh(
+        @Req() req,
+        @Res({ passthrough: true }) res: express.Response,
+    ) {
+        const { sub: userId } = req.user;
         const oldRT = req.user.refreshToken;
 
-        console.log("OLDRT:", oldRT)
-
         // Generate new tokens
-        const { accessToken, refreshToken } = await this.authService.refreshTokens(userId, oldRT);
+        const { accessToken, refreshToken } =
+            await this.authService.refreshTokens(userId, oldRT);
 
-        res.cookie("refresh_token", refreshToken, {
+        res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: true,
-            sameSite: "strict",
-            path: "/auth/refresh",
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
         });
 
-        return res.json({ accessToken })
+        return { accessToken };
     }
-
 
     @Post('/logout')
     @UseGuards(JwtAuthGuard)
-    async logout(@Req() req, @Res({ passthrough: true }) res: express.Response) {
+    async logout(
+        @Req() req,
+        @Res({ passthrough: true }) res: express.Response,
+    ) {
         const userId = req.user.sub;
 
         // clear refreshToken at DB
         await this.authService.logout(userId);
 
         //clear cookie in client
-        res.clearCookie("refresh_token", {
+        res.clearCookie('refresh_token', {
             httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
-            path: '/auth/refresh',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
         });
 
-        return { message: 'Logged out successfully' }
-
+        return { success: true, message: 'Logged out successfully' };
     }
 }

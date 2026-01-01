@@ -11,16 +11,23 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshStrategy } from './strategies/refresh.strategy';
 
 @Module({
-  imports: [
-    ConfigModule,
-    JwtModule.register({ //Can keep empty: manipuate in insides
-      // secret: process.env.JWT_ACCESS_SECRET,
-      // signOptions: { expiresIn: '15m' }, //short-lived access token
-    }),
-    PassportModule,
-    DatabaseModule,
-  ],
-  providers: [AuthService, UsersService, DatabaseService, JwtStrategy, RefreshStrategy],//strategies must be listed
-  controllers: [AuthController]
+    imports: [
+        ConfigModule,
+        JwtModule.register({
+            //Can keep empty: manipulate in insides
+            // secret: process.env.JWT_ACCESS_SECRET,
+            // signOptions: { expiresIn: '15m' }, //short-lived access token
+        }),
+        PassportModule,
+        DatabaseModule,
+    ],
+    providers: [
+        AuthService,
+        UsersService,
+        DatabaseService,
+        JwtStrategy,
+        RefreshStrategy,
+    ], //strategies must be listed
+    controllers: [AuthController],
 })
-export class AuthModule { }
+export class AuthModule {}

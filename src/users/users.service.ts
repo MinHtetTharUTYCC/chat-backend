@@ -11,11 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly databaseService: DatabaseService) {
-        console.log('DEPENDEN:::', {
-            dep1: DatabaseService,
-        });
-    }
+    constructor(private readonly databaseService: DatabaseService) {}
 
     async userExistsByMail(email: string): Promise<boolean> {
         const user = await this.databaseService.user.findUnique({
@@ -68,7 +64,7 @@ export class UsersService {
     async getRefreshTokenOfUser(userId: string) {
         const user = await this.databaseService.user.findUnique({
             where: { id: userId },
-            select: { id: true, refreshToken: true },
+            select: { id: true, username: true, refreshToken: true },
         });
         if (!user) throw new NotFoundException('User not found');
         return user;
@@ -111,55 +107,6 @@ export class UsersService {
         return user;
     }
 
-    // async viewUser(userId: string, viewUserId: string) {
-    //     const [user, chat] = await Promise.all([
-    //         this.databaseService.user.findUnique({
-    //             where: { id: viewUserId },
-    //             select: {
-    //                 id: true,
-    //                 username: true,
-    //                 createdAt: true,
-    //             },
-    //         }),
-    //         await this.databaseService.chat.findFirst({
-    //             where: {
-    //                 isGroup: false,
-    //                 AND: [
-    //                     { participants: { some: { userId } } },
-    //                     { participants: { some: { userId: viewUserId } } },
-    //                 ],
-    //             },
-    //             select: {
-    //                 id: true,
-    //             },
-    //         }),
-    //     ]);
-
-    //     if (!user) throw new NotFoundException('User not found');
-
-    //     return {
-    //         user,
-    //         chatId: chat?.id || null, //to go/redirect if chat exists
-    //     };
-    // }
-
-    async viewUser(viewUserId: string) {
-        const user = await this.databaseService.user.findUnique({
-            where: { id: viewUserId },
-            select: {
-                id: true,
-                username: true,
-            },
-        });
-
-        if (!user) throw new NotFoundException('User not found');
-
-        return {
-            id: user.id,
-            username: user.username,
-        };
-    }
-
     async updateUser(userId: string, dto: UpdateUserDto) {
         const user = await this.databaseService.user.update({
             where: { id: userId },
@@ -184,26 +131,7 @@ export class UsersService {
                 id: {
                     not: userId,
                 },
-                username: {
-                    contains: query,
-                    mode: 'insensitive',
-                },
-            },
-            select: {
-                id: true,
-                username: true,
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-    }
-    async getAllUsers(userId: string) {
-        return this.databaseService.user.findMany({
-            where: {
-                id: {
-                    not: userId,
-                },
+                username: { contains: query, mode: 'insensitive' },
             },
             select: {
                 id: true,

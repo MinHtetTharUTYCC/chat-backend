@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { ChatGateway } from './chat.gateway';
-import { NotificationType } from '@prisma/client';
 import { NotificationService } from 'src/notification/notification.service';
 import { MessageService } from 'src/message/message.service';
 import { RedisService } from 'src/redis/redis.service';
+import { NotificationType, Prisma } from 'generated/prisma';
+import { RequestUser } from 'src/auth/interfaces/request-user.interface';
+import { generateDmKey } from 'src/utils/chat.utils';
 
 @Injectable()
 export class ChatService {
@@ -81,12 +83,68 @@ export class ChatService {
         );
 
         if (isParticipant) {
-            return this.getChat(chatId);
+            return this.getFullChat(chatId);
+        }
+
+        return this.getPreviewChat(chatId);
+    }
+
+    async getFullChat(chatId: string) {
+        const cachedKey = `chat:${chatId}`;
+        const cached = await this.redisService.get(cachedKey);
+        const cachedResult = cached ? JSON.parse(cached) : null;
+
+        if (cachedResult) {
+            console.log('Returning chat from cache..', cachedResult);
+            return cachedResult;
         }
 
         const chat = await this.databaseService.chat.findUnique({
+            where: {
+                id: chatId, //'am i participant?' is already checked at viewChat()
+            },
+            select: {
+                id: true,
+                title: true,
+                isGroup: true,
+                createdAt: true,
+                participants: {
+                    select: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!chat) throw new NotFoundException('Chat not found');
+
+        const chatData = {
+            id: chat.id,
+            title: chat.title,
+            isGroup: chat.isGroup,
+            createdAt: chat.createdAt,
+            participants: chat.participants,
+            isParticipant: true,
+        };
+
+        await this.redisService.set(cachedKey, JSON.stringify(chatData), 300); //5 minutes
+
+        return chatData;
+    }
+
+    async getPreviewChat(chatId: string) {
+        const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId },
-            include: {
+            select: {
+                id: true,
+                title: true,
+                isGroup: true,
+                createdAt: true,
                 _count: {
                     select: {
                         participants: true,
@@ -105,135 +163,146 @@ export class ChatService {
         }
 
         return {
-            chat,
-            isNewGroupChat: true,
+            id: chat.id,
+            title: chat.title,
+            isGroup: chat.isGroup,
+            createdAt: chat.createdAt,
+            participants: [],
+            participantsCount: chat._count.participants,
+            isParticipant: false,
         };
     }
 
-    async getChat(chatId: string) {
-        const cachedKey = `chat:${chatId}`;
-        const cached = await this.redisService.get(cachedKey);
-        const cachedResult = cached ? JSON.parse(cached) : null;
-
-        if (cachedResult) {
-            console.log('Returning latest chat from cache...');
-            return cachedResult;
-        }
-
-        const chat = await this.databaseService.chat.findUnique({
-            where: {
-                id: chatId, //'am i participant?' is already checked at viewChat()
-            },
-            include: {
-                participants: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                            },
-                        },
-                    },
-                },
-                messages: {
-                    include: {
-                        sender: {
-                            select: {
-                                id: true,
-                                username: true,
-                            },
-                        },
-                    },
-                    take: 20,
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                },
-            },
-        });
-
-        if (!chat) throw new NotFoundException('Chat not found');
-
-        await this.redisService.set(cachedKey, JSON.stringify(chat), 300); //5 minutes
-
-        return chat;
-    }
-
-    async startChat(userId: string, otherUserId: string) {
-        if (userId === otherUserId) {
+    async startChat(me: RequestUser, otherUserId: string) {
+        if (me.sub === otherUserId) {
             throw new BadRequestException('You cannot chat with yourself');
         }
-        // check if other user is valid
-        const otherUser = await this.databaseService.user.findUnique({
-            where: { id: otherUserId },
-            select: { id: true },
-        });
-        if (!otherUser) throw new NotFoundException('User not found');
 
-        //check if chat exists already
-        const existingChat = await this.databaseService.chat.findFirst({
-            where: {
-                participants: {
-                    some: { userId },
-                },
-                AND: [
-                    {
-                        participants: {
-                            some: {
-                                userId: otherUserId,
-                            },
+        const dmKey = generateDmKey(me.sub, otherUserId);
+
+        const chatItemInclude = {
+            messages: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+            },
+            participants: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            username: true,
                         },
                     },
-                    //sure it's a DM, not GroupChat
-                    {
-                        isGroup: false,
-                    },
-                ],
-            },
-            select: {
-                id: true,
-            },
-        });
-
-        if (existingChat)
-            return {
-                oldChatExists: true,
-                chat: existingChat,
-            };
-
-        //create new chat
-        const newChat = await this.databaseService.chat.create({
-            data: {
-                participants: {
-                    create: [{ userId }, { userId: otherUserId }],
                 },
             },
-            select: {
-                id: true,
-            },
+        } as const;
+
+        const result = await this.databaseService.$transaction(async (tx) => {
+            const existingChat = await tx.chat.findUnique({
+                where: { dmKey },
+                include: chatItemInclude,
+            });
+
+            if (existingChat) {
+                return { chat: existingChat, isNew: false };
+            }
+
+            try {
+                const newChat = await tx.chat.create({
+                    data: {
+                        dmKey,
+                        isGroup: false,
+                        participants: {
+                            create: [
+                                { userId: me.sub },
+                                { userId: otherUserId },
+                            ],
+                        },
+                    },
+                    include: chatItemInclude,
+                });
+                return { chat: newChat, isNew: true };
+            } catch (error) {
+                // P2002: Unique constraint failed on the field: `dmKey`
+                // the chat was created by the other user just now.
+                if (error.code === 'P2002') {
+                    const retryChat =
+                        await this.databaseService.chat.findUnique({
+                            where: { dmKey: dmKey },
+                            include: {
+                                messages: {
+                                    orderBy: { createdAt: 'desc' },
+                                    take: 1,
+                                },
+                                participants: {
+                                    include: {
+                                        user: {
+                                            select: {
+                                                id: true,
+                                                username: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        });
+                    return { oldChatExists: true, chat: retryChat };
+                }
+                // P2003: Foreign key failed (User ID doesn't exist)
+                if (error.code === 'P2003') {
+                    throw new NotFoundException('User not found');
+                }
+                throw error;
+            }
         });
 
-        await this.notificationService.createNotification(userId, newChat.id, {
-            receiverId: otherUserId,
-            type: NotificationType.NEW_CHAT,
-        });
+        if (result.isNew) {
+            this.runNewChatSideEffects(me, otherUserId, result.chat.id).catch(
+                (error) =>
+                    console.error(
+                        'Background task for starting new chat failed:',
+                        error,
+                    ),
+            );
+        }
+
+        return { oldChatExists: !result.isNew, chat: result.chat };
+    }
+
+    private async runNewChatSideEffects(
+        me: RequestUser,
+        otherUserId: string,
+        chatId: string,
+    ) {
+        const promises: Promise<any>[] = [];
+
+        promises.push(
+            this.notificationService.createNotification(me.sub, chatId, {
+                receiverId: otherUserId,
+                type: NotificationType.NEW_CHAT,
+            }),
+        );
 
         const socketPayload = {
-            type: NotificationType.NEW_CHAT,
-            data: newChat,
+            chatId,
+            user: {
+                id: me.sub,
+                username: me.username,
+            },
         };
+        // Broadcast vis WS
         this.chatGateway.server
             .to(`user_${otherUserId}`)
             .emit('new_chat', socketPayload);
 
-        // Invalidate cache for both users
-        await this.redisService.del(`user:${userId}:chats`);
-        await this.redisService.del(`user:${otherUserId}:chats`);
+        // Invalidate cache
+        const keysToDelete = [
+            `user:${me.sub}:chats`,
+            `user:${otherUserId}:chats`,
+        ];
+        promises.push(this.redisService.del(...keysToDelete));
 
-        return {
-            oldChatExists: false,
-            chat: newChat,
-        };
+        await Promise.all(promises);
     }
 
     async getMyFriendsIds(userId: string) {
@@ -281,92 +350,119 @@ export class ChatService {
         return chats.map((chat) => chat.id);
     }
 
-    async updateChatTitle(userId: string, chatId: string, newTitle: string) {
-        const result = await this.databaseService.$transaction(async (tx) => {
-            const chat = await tx.chat.findUnique({
-                where: { id: chatId },
-                select: {
-                    id: true,
-                    isGroup: true,
-                    participants: {
-                        select: {
-                            userId: true,
+    async updateChatTitle(me: RequestUser, chatId: string, newTitle: string) {
+        const formattedTitle = newTitle.trim() || null;
+
+        const { participants } = await this.databaseService.$transaction(
+            async (tx) => {
+                const existingChat = await tx.chat.findUnique({
+                    where: { id: chatId },
+                    include: {
+                        participants: {
+                            select: {
+                                userId: true,
+                            },
                         },
                     },
-                },
-            });
+                });
 
-            const participant = await tx.participant.findUnique({
-                where: {
-                    userId_chatId: {
-                        userId,
-                        chatId,
-                    },
-                },
-                select: {
-                    user: {
-                        select: {
-                            username: true,
-                        },
-                    },
-                },
-            });
+                if (!existingChat)
+                    throw new NotFoundException('Chat not found');
+                if (!existingChat.isGroup)
+                    throw new ForbiddenException(
+                        'Direct messages cannot have custom titles',
+                    );
 
-            return { chat, participant };
-        });
+                const isMember = existingChat.participants.some(
+                    (p) => p.userId === me.sub,
+                );
 
-        if (!result.chat) throw new NotFoundException('Chat not found');
-        if (!result.chat.isGroup)
-            throw new ForbiddenException(
-                'Direct messages cannot have custom titles',
-            );
+                if (!isMember) {
+                    throw new ForbiddenException(
+                        'You are not the member of this chat',
+                    );
+                }
 
-        if (!result.participant)
-            throw new ForbiddenException('You are not the member of this chat');
+                const result = await tx.chat.update({
+                    where: { id: chatId },
+                    data: { title: formattedTitle },
+                });
 
-        const dataToUpdate = {
-            title: newTitle === '' ? null : newTitle,
-        };
-
-        await this.databaseService.chat.update({
-            where: { id: chatId },
-            data: dataToUpdate,
-        });
-
-        // INVALIDATE Cache
-        //del chat details
-        await this.redisService.del(`chat:${chatId}`);
-        //del chats
-        const promises = result.chat.participants.map((parti) =>
-            this.redisService.del(`user:${parti.userId}:chats`),
+                return {
+                    participants: existingChat.participants,
+                };
+            },
         );
-        await Promise.all(promises);
 
-        // Broadcast via WS
-        this.chatGateway.server.to(`chat_${chatId}`).emit('title_update', {
+        const payload = {
             chatId,
-            newTitle,
-            updatedById: userId,
-            updatedByUsername: result.participant.user.username,
-        });
-
-        return {
-            success: true,
-            chatId,
-            newTitle,
+            newTitle: formattedTitle,
+            actor: {
+                id: me.sub,
+                username: me.username,
+            },
         };
+
+        const runBackgroundTasks = async () => {
+            try {
+                const promises: Promise<any>[] = [];
+
+                const keysToDelete = [`chat:${chatId}`];
+                participants.forEach((parti) => {
+                    keysToDelete.push(`user:${parti.userId}:chats`);
+                });
+
+                if (keysToDelete.length > 0) {
+                    promises.push(this.redisService.del(...keysToDelete));
+                }
+
+                const recepients = participants.filter(
+                    (p) => p.userId !== me.sub,
+                );
+                if (recepients.length > 0) {
+                    const nofifyJob = Promise.all(
+                        recepients.map(async (parti) =>
+                            this.notificationService.createNotification(
+                                me.sub,
+                                chatId,
+                                {
+                                    receiverId: parti.userId,
+                                    type: NotificationType.TITLE_UPDATED,
+                                },
+                            ),
+                        ),
+                    );
+
+                    promises.push(nofifyJob);
+                }
+
+                // Broadcast via WS
+                this.chatGateway.server
+                    .to(`chat_${chatId}`)
+                    .emit('title_update', payload);
+
+                await Promise.all(promises);
+            } catch (error) {
+                console.error(
+                    `Background task failed for updating chat tile ${chatId}:`,
+                    error,
+                );
+            }
+        };
+        runBackgroundTasks(); //fire and forget
+
+        return { chatId, title: formattedTitle };
     }
 
-    async createGroupChat(userId: string, title: string, userIds: string[]) {
-        // Set: for removing dupblicates
-        let uniqueUserIds = new Set<string>([...userIds, userId]);
+    async createGroupChat(me: RequestUser, title: string, userIds: string[]) {
+        const uniqueUserIds = new Set<string>([...userIds, me.sub]);
         const usersToParticipate = Array.from(uniqueUserIds).map((id) => ({
             userId: id,
         }));
 
         if (usersToParticipate.length < 2) {
             throw new BadRequestException(
-                'A group must have at least 2 participants',
+                'A group must have at one other member',
             );
         }
 
@@ -379,6 +475,7 @@ export class ChatService {
                 },
             },
             include: {
+                messages: true,
                 participants: {
                     include: {
                         user: {
@@ -389,9 +486,464 @@ export class ChatService {
                         },
                     },
                 },
-                messages: {
-                    include: {
-                        sender: {
+            },
+        });
+
+        uniqueUserIds.delete(me.sub); //deduct me
+        const usersToNotify = Array.from(uniqueUserIds).map(
+            (id) => `user_${id}`,
+        );
+
+        const runBackgroundTasks = async () => {
+            try {
+                const promises: Promise<any>[] = [];
+
+                const nofifyJob = Promise.all(
+                    Array.from(uniqueUserIds).map((id) => {
+                        return this.notificationService.createNotification(
+                            me.sub,
+                            groupChat.id,
+                            {
+                                receiverId: id,
+                                type: NotificationType.GROUP_ADDED,
+                            },
+                        );
+                    }),
+                );
+
+                promises.push(nofifyJob);
+
+                const socketPayload = {
+                    chatId: groupChat.id,
+                    title: groupChat.title ?? 'New Group',
+                    user: {
+                        id: me.sub,
+                        username: me.username,
+                    },
+                };
+
+                // Broadcast vis WS
+                this.chatGateway.server
+                    .to(usersToNotify)
+                    .emit('group_added', socketPayload);
+
+                // Invalidate cache
+                const keysToDelete: string[] = [];
+                Array.from([...uniqueUserIds, me.sub]).forEach((id) =>
+                    keysToDelete.push(`user:${id}:chats`),
+                );
+
+                promises.push(this.redisService.del(...keysToDelete));
+
+                await Promise.all(promises);
+            } catch (error) {
+                console.error(
+                    'Failed to run backgroun tasks for new group creation',
+                    error,
+                );
+            }
+        };
+
+        runBackgroundTasks(); //fire and forgot
+
+        return groupChat;
+    }
+
+    async addToGroupChat(me: RequestUser, chatId: string, userIds: string[]) {
+        const requestedUserIds = new Set(userIds.filter((id) => id !== me.sub));
+        if (requestedUserIds.size === 0) {
+            throw new BadRequestException('No valid users to add');
+        }
+
+        const { chat, addedUserIds } = await this.databaseService.$transaction(
+            async (tx) => {
+                const existingChat = await tx.chat.findUnique({
+                    where: { id: chatId },
+                    select: {
+                        id: true,
+                        title: true,
+                        isGroup: true,
+                        participants: {
+                            select: { userId: true },
+                        },
+                    },
+                });
+
+                if (!existingChat)
+                    throw new NotFoundException('Chat not found');
+
+                // Check if requester is a member
+                const isRequesterMember = existingChat.participants.some(
+                    (p) => p.userId === me.sub,
+                );
+                if (!isRequesterMember)
+                    throw new ForbiddenException(
+                        'You are not a member of this chat',
+                    );
+
+                if (!existingChat.isGroup)
+                    throw new ForbiddenException(
+                        'Cannot add members to a Direct Message. Create a group instead.',
+                    );
+
+                //Filter out users who are ALREADY members
+                const existingMemberIds = new Set(
+                    existingChat.participants.map((p) => p.userId),
+                );
+                const usersToAdd = Array.from(requestedUserIds).filter(
+                    (id) => !existingMemberIds.has(id),
+                );
+
+                if (usersToAdd.length === 0) {
+                    // If everyone requested is already in the group, just return early
+                    return {
+                        chat: existingChat,
+                        addedUserIds: [],
+                    };
+                }
+
+                try {
+                    await tx.participant.createMany({
+                        data: usersToAdd.map((userId) => ({
+                            chatId,
+                            userId,
+                        })),
+                        skipDuplicates: true,
+                    });
+                } catch (error) {
+                    // Handle "User does not exist" (Foreign Key Constraint Fails)
+                    if (error.code === 'P2003') {
+                        // Prisma FK violation code
+                        throw new BadRequestException(
+                            'One or more user IDs do not exist',
+                        );
+                    }
+                    throw error;
+                }
+
+                return {
+                    chat: existingChat,
+                    addedUserIds: usersToAdd,
+                };
+            },
+        );
+
+        if (addedUserIds.length === 0) {
+            return {
+                success: true,
+                addedMembersCount: 0,
+                chatId,
+            };
+        }
+
+        const runBackgroundTasks = async () => {
+            try {
+                const promises: Promise<any>[] = [];
+
+                const keysToDelete = [`chat:${chatId}`];
+                //old members
+                chat.participants.forEach((p) => {
+                    keysToDelete.push(`user:${p.userId}:chats`);
+                });
+                //new members
+                addedUserIds.forEach((id) =>
+                    keysToDelete.push(`user:${id}:chats`),
+                );
+
+                if (keysToDelete.length > 0) {
+                    promises.push(this.redisService.del(...keysToDelete));
+                }
+
+                //notis only for new users
+                const notifyJob = Promise.all(
+                    addedUserIds.map((id) =>
+                        this.notificationService.createNotification(
+                            me.sub,
+                            chatId,
+                            {
+                                receiverId: id,
+                                type: NotificationType.GROUP_ADDED,
+                            },
+                        ),
+                    ),
+                );
+                promises.push(notifyJob);
+
+                const socketPayload = {
+                    chatId,
+                    title: chat.title ?? 'Group Chat',
+                    user: {
+                        id: me.sub,
+                        username: me.username,
+                    },
+                };
+
+                // Broadcast via WS
+                // old members
+                this.chatGateway.server
+                    .to(`chat_${chatId}`)
+                    .emit('members_added', {
+                        ...socketPayload,
+                        addedMembersCount: addedUserIds.length,
+                    });
+                //new members
+                const newMemberRooms = addedUserIds.map((id) => `user_${id}`);
+                this.chatGateway.server
+                    .to(newMemberRooms)
+                    .emit('group_added', socketPayload);
+
+                await Promise.all(promises);
+            } catch (error) {
+                console.error(
+                    `Background task failed for adding members to chat: ${chatId}:`,
+                    error,
+                );
+            }
+        };
+
+        runBackgroundTasks(); //fire and forget
+
+        return {
+            success: true,
+            chatId,
+            addedMembersCount: addedUserIds.length,
+        };
+    }
+    async inviteToGroupChat(
+        me: RequestUser,
+        chatId: string,
+        userIds: string[],
+    ) {
+        const requestedUserIds = new Set(userIds.filter((id) => id !== me.sub));
+        if (requestedUserIds.size === 0) {
+            throw new BadRequestException('No valid users to add');
+        }
+
+        const { chat, usersToInvite } = await this.databaseService.$transaction(
+            async (tx) => {
+                const existingChat = await tx.chat.findUnique({
+                    where: { id: chatId },
+                    select: {
+                        id: true,
+                        title: true,
+                        isGroup: true,
+                        participants: {
+                            select: { userId: true },
+                        },
+                    },
+                });
+
+                if (!existingChat)
+                    throw new NotFoundException('Chat not found');
+
+                // Check if requester is a member
+                const isRequesterMember = existingChat.participants.some(
+                    (p) => p.userId === me.sub,
+                );
+                if (!isRequesterMember)
+                    throw new ForbiddenException(
+                        'You are not a member of this chat',
+                    );
+
+                if (!existingChat.isGroup)
+                    throw new ForbiddenException(
+                        'Cannot add members to a Direct Message. Create a group instead.',
+                    );
+
+                //Filter out users who are ALREADY members
+                const existingMemberIds = new Set(
+                    existingChat.participants.map((p) => p.userId),
+                );
+                const usersToInvite = Array.from(requestedUserIds).filter(
+                    (id) => !existingMemberIds.has(id),
+                );
+
+                if (usersToInvite.length === 0) {
+                    // If everyone requested is already in the group, just return early
+                    return {
+                        chat: existingChat,
+                        usersToInvite: [],
+                    };
+                }
+
+                return {
+                    chat: existingChat,
+                    usersToInvite,
+                };
+            },
+        );
+
+        if (usersToInvite.length === 0) {
+            return {
+                success: true,
+                invitedMembersCount: 0,
+                chatId,
+            };
+        }
+
+        const runBackgroundTasks = async () => {
+            try {
+                const socketPayload = {
+                    chatId,
+                    title: chat.title ?? 'Group Chat',
+                    user: {
+                        id: me.sub,
+                        username: me.username,
+                    },
+                };
+
+                //new members
+                const newMemberRooms = usersToInvite.map((id) => `user_${id}`);
+                this.chatGateway.server
+                    .to(newMemberRooms)
+                    .emit('group_invited', socketPayload);
+
+                await Promise.all(
+                    usersToInvite.map((id) =>
+                        this.notificationService.createNotification(
+                            me.sub,
+                            chatId,
+                            {
+                                receiverId: id,
+                                type: NotificationType.GROUP_INVITED,
+                            },
+                        ),
+                    ),
+                );
+            } catch (error) {
+                console.error(
+                    `Background task failed for inviting members to chat: ${chatId}:`,
+                    error,
+                );
+            }
+        };
+
+        runBackgroundTasks(); //fire and forget
+
+        return {
+            success: true,
+            chatId,
+            invitedMembersCount: usersToInvite.length,
+        };
+    }
+
+    async joinGroup(me: RequestUser, chatId: string) {
+        const { chat, existingParticipant } =
+            await this.databaseService.$transaction(async (tx) => {
+                const chat = await tx.chat.findUnique({
+                    where: { id: chatId },
+                    select: {
+                        isGroup: true,
+                        title: true,
+                    },
+                });
+                const existingParticipant = await tx.participant.findUnique({
+                    where: {
+                        userId_chatId: {
+                            userId: me.sub,
+                            chatId,
+                        },
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+                return { chat, existingParticipant };
+            });
+
+        if (!chat) throw new NotFoundException('Chat not found');
+        if (!chat.isGroup)
+            throw new ForbiddenException(
+                'You cannot join a direct message chat',
+            );
+        if (existingParticipant)
+            throw new ConflictException('Already joined the chat');
+
+        await this.databaseService.participant.create({
+            data: {
+                userId: me.sub,
+                chatId,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        const payload = {
+            chatId,
+            title: chat.title ?? 'Group Chat',
+            user: {
+                id: me.sub,
+                username: me.username,
+            },
+        };
+
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('user_joined_group', payload);
+
+        // validate cache
+        const keysToDelete = [`user:${me.sub}:chats`, `chat:${chatId}`];
+        this.redisService.del(...keysToDelete);
+
+        return {
+            success: true,
+            chatId,
+        };
+    }
+
+    async leaveGroup(me: RequestUser, chatId: string) {
+        await this.messageService.verifyMembership(me.sub, chatId);
+
+        const participant = await this.databaseService.participant.delete({
+            where: {
+                userId_chatId: {
+                    userId: me.sub,
+                    chatId,
+                },
+            },
+            select: {
+                chat: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
+            },
+        });
+
+        const payload = {
+            chatId,
+            title: participant.chat.title ?? 'Group Chat',
+            user: {
+                id: me.sub,
+                username: me.username,
+            },
+        };
+
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('user_left_group', payload);
+
+        // invalidate cache
+        const keysToDelete = [`user:${me.sub}:chats`, `chat:${chatId}`];
+        this.redisService.del(...keysToDelete);
+
+        return {
+            success: true,
+            chatId,
+        };
+    }
+
+    async searchUsersToInvite(me: RequestUser, chatId: string, q?: string) {
+        const chat = await this.databaseService.chat.findUnique({
+            where: { id: chatId },
+            select: {
+                id: true,
+                isGroup: true,
+                participants: {
+                    select: {
+                        user: {
                             select: {
                                 id: true,
                                 username: true,
@@ -401,216 +953,37 @@ export class ChatService {
                 },
             },
         });
+        if (!chat) throw new NotFoundException('Chat not found');
+        if (!chat.isGroup)
+            throw new NotFoundException(
+                'You cannot add members to direct chat',
+            );
 
-        uniqueUserIds.delete(userId); //deduct me
-        const usersToNotify = Array.from(uniqueUserIds).map(
-            (id) => `user_${id}`,
-        );
+        if (!chat.participants.some((p) => p.user.id === me.sub)) {
+            throw new ForbiddenException('You are not a member of this chat');
+        }
 
-        await Promise.all(
-            Array.from(uniqueUserIds).map(async (id) => {
-                await this.notificationService.createNotification(
-                    userId,
-                    groupChat.id,
-                    {
-                        receiverId: id,
-                        type: NotificationType.GROUP_ADDED,
-                    },
-                );
-            }),
-        );
-
-        const socketPayload = {
-            type: NotificationType.GROUP_ADDED,
-            data: groupChat,
+        const where: Prisma.UserWhereInput = {
+            id: {
+                notIn: [...chat.participants.map((p) => p.user.id)],
+            },
         };
 
-        this.chatGateway.server
-            .to(usersToNotify)
-            .emit('group_added', socketPayload);
-
-        // Invalidate cache
-        await Promise.all(
-            Array.from([...uniqueUserIds, userId]).map(async (id) => {
-                await this.redisService.del(`user:${id}:chats`);
-            }),
-        );
-
-        return groupChat;
-    }
-
-    async addToGroupChat(userId: string, chatId: string, userIds: string[]) {
-        const chat = await this.databaseService.chat.findUnique({
-            where: { id: chatId },
-            select: {
-                isGroup: true,
-                participants: {
-                    where: {
-                        userId,
-                    },
-                    select: {
-                        id: true,
-                    },
-                },
-            },
-        });
-        if (!chat) throw new NotFoundException('Chat not found');
-        if (chat.participants.length === 0)
-            throw new ForbiddenException('You are not a member of this chat');
-        if (!chat.isGroup)
-            throw new ForbiddenException(
-                'You cannot add members to 1-on-1 chat. Create a group instead.',
-            );
-
-        const uniqueUserIds = new Set(userIds.filter((id) => id !== userId)); //filter me(if exists) and remove duplicates
-        const newUsersToParticipate = Array.from(uniqueUserIds).map((id) => ({
-            userId: id,
-        }));
-        const newUsersToNotify = Array.from(uniqueUserIds).map(
-            (id) => `user_${id}`,
-        );
-
-        try {
-            const updatedChat = await this.databaseService.chat.update({
-                where: {
-                    id: chatId,
-                },
-                data: {
-                    participants: {
-                        create: newUsersToParticipate,
-                    },
-                },
-                include: {
-                    participants: {
-                        include: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                },
-                            },
-                        },
-                    },
-                },
-            });
-
-            await Promise.all(
-                Array.from(uniqueUserIds).map(async (id) => {
-                    await this.notificationService.createNotification(
-                        userId,
-                        chatId,
-                        {
-                            receiverId: id,
-                            type: NotificationType.GROUP_ADDED,
-                        },
-                    );
-                }),
-            );
-
-            const socketPayload = {
-                type: NotificationType.GROUP_ADDED,
-                data: updatedChat,
-            };
-
-            this.chatGateway.server
-                .to(newUsersToNotify)
-                .emit('group_added', socketPayload);
-
-            // Invalidate cache
-            await Promise.all(
-                Array.from(uniqueUserIds).map(async (id) => {
-                    await this.redisService.del(`user:${id}:chats`);
-                }),
-            );
-
-            return updatedChat;
-        } catch (error) {
-            if (error.code === 'P2025') {
-                throw new BadRequestException('One or more users do not exist');
-            }
-            throw error;
+        if (q) {
+            where.OR = [
+                { username: { contains: q, mode: 'insensitive' } },
+                { email: { contains: q, mode: 'insensitive' } },
+            ];
         }
-    }
 
-    async joinGroup(userId: string, chatId: string) {
-        const existingParticipant =
-            await this.databaseService.participant.findUnique({
-                where: {
-                    userId_chatId: {
-                        userId,
-                        chatId,
-                    },
-                },
-                select: {
-                    id: true,
-                },
-            });
-        if (existingParticipant)
-            throw new ConflictException('Already joined the chat');
-
-        await this.databaseService.participant.create({
-            data: {
-                userId,
-                chatId,
-            },
+        const availabeUsers = await this.databaseService.user.findMany({
+            where,
             select: {
                 id: true,
-                user: {
-                    select: {
-                        id: true,
-                        username: true,
-                    },
-                },
+                username: true,
             },
         });
 
-        const socketPaylod = {
-            chatId,
-            timestamp: new Date(),
-        };
-
-        // update UI immediately
-        this.chatGateway.server
-            .to(`user_${userId}`)
-            .emit('group_joined', socketPaylod);
-
-        // VALIDATE chats cache
-        await this.redisService.del(`user:${userId}:chats`);
-
-        return {
-            success: true,
-            message: 'Successfully joined the group chat.',
-        };
-    }
-
-    async leaveGroup(userId: string, chatId: string) {
-        await this.messageService.verifyMembership(userId, chatId);
-
-        await this.databaseService.participant.delete({
-            where: {
-                userId_chatId: {
-                    userId,
-                    chatId,
-                },
-            },
-        });
-
-        const socketPaylod = {
-            chatId,
-            timestamp: new Date(),
-        };
-
-        // update UI immediately
-        this.chatGateway.server
-            .to(`user_${userId}`)
-            .emit('group_leaved', socketPaylod);
-
-        // invalidate chats cache
-        await this.redisService.del(`user:${userId}:chats`);
-
-        return {
-            success: true,
-            message: 'Successfully leaved the chat',
-        };
+        return availabeUsers;
     }
 }

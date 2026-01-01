@@ -10,32 +10,15 @@ export class NotificationService {
         chatId: string,
         dto: CreateNotificationDto,
     ) {
-        const notification = await this.databaseService.notification.create({
+        await this.databaseService.notification.create({
             data: {
                 chatId,
                 actorId: userId,
                 receiverId: dto.receiverId,
                 type: dto.type,
                 data: dto.data,
-                pinnedId: dto.pinnedId,
-            },
-            include: {
-                actor: {
-                    select: {
-                        id: true,
-                        username: true,
-                    },
-                },
-                chat: {
-                    select: {
-                        id: true,
-                        title: true,
-                    },
-                },
             },
         });
-
-        return notification;
     }
     async getNotifications(
         userId: string,

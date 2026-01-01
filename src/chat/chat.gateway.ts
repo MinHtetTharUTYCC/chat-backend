@@ -52,7 +52,10 @@ export class ChatGateway
                     secret: process.env.JWT_ACCESS_SECRET,
                 });
 
-                socket.data.user = { sub: payload.sub };
+                socket.data.user = {
+                    sub: payload.sub,
+                    username: payload.username,
+                };
                 next();
             } catch (error) {
                 next(new Error('Unauthorized'));
@@ -81,24 +84,6 @@ export class ChatGateway
         console.log('❌ Client Disconnected: ', client.id);
 
         await this.setUserOffline(userId);
-
-        //set presence Status
-        // this.presenceService.setOffline(userId);
-        // const friendsIds = await this.chatService.getMyFriendsIds(userId);
-        // const onlineFriends = new Set<string>()
-
-        // for (const friId in friendsIds) {
-        //   onlineFriends.add(`user_${friId}`)
-        // }
-
-        // const friendRooms = Array.from(onlineFriends);
-        // if (friendRooms.length > 0) {
-        //   this.server.to(friendRooms).emit('presence_update', {
-        //     userId,
-        //     online: false,
-        //     lastSeen: Date.now()
-        //   })
-        // }
     }
 
     @SubscribeMessage('user_online')
@@ -133,27 +118,6 @@ export class ChatGateway
 
         return { status: 'offline' };
     }
-
-    // @SubscribeMessage('user_away')
-    // async handleUserAway(@ConnectedSocket() socket: Socket) {
-    //     const userId = socket.data.user.sub;
-    //     console.log('User away:', userId);
-
-    //     if (!userId) return;
-
-    //     // Redis
-    //     await this.presenceService.setAway(userId);
-
-    //     // Emit
-    //     const chatRooms = await this.getUserChatRooms(userId);
-    //     this.server.to(chatRooms).emit('presence_update', {
-    //         userId,
-    //         online: false, // Or create an 'away' status
-    //         lastSeen: Date.now().toString(),
-    //     });
-
-    //     return { status: 'away' };
-    // }
 
     @SubscribeMessage('heartbeat')
     async handleHeartbeat(@ConnectedSocket() client: Socket) {
@@ -195,25 +159,6 @@ export class ChatGateway
             chatId: payload.chatId,
             isTyping: payload.isTyping,
         });
-
-        // frontend
-        // let typingTimeout = null;
-        // function onKeyDown() {
-        //   // 1. If not already typing, tell server we started
-        //   if (!isTyping) {
-        //     socket.emit('typing', { conversationId: 1, isTyping: true });
-        //     isTyping = true;
-        //   }
-
-        //   // 2. Clear previous timeout
-        //   clearTimeout(typingTimeout);
-
-        //   // 3. Set a new timeout to stop typing after 2 seconds of inactivity
-        //   typingTimeout = setTimeout(() => {
-        //     socket.emit('typing', { conversationId: 1, isTyping: false });
-        //     isTyping = false;
-        //   }, 2000);
-        // }
     }
 
     private async setUserOffline(userId: string) {
