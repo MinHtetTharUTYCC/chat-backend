@@ -9,6 +9,11 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
 
+export type JwtPayload = {
+    sub: string;
+    username: string;
+};
+
 @Injectable()
 export class AuthService {
     constructor(
@@ -16,26 +21,20 @@ export class AuthService {
         private readonly usersService: UsersService,
     ) {}
 
-    async getTokens(userId: string) {
-        const accessToken = await this.jwt.signAsync(
-            {
-                sub: userId,
-            },
-            {
-                secret: process.env.JWT_ACCESS_SECRET,
-                expiresIn: '3h',
-            },
-        );
+    async getTokens(userId: string, username: string) {
+        const payload: JwtPayload = {
+            sub: userId,
+            username,
+        };
 
-        const refreshToken = await this.jwt.signAsync(
-            {
-                sub: userId,
-            },
-            {
-                secret: process.env.JWT_REFRESH_SECRET,
-                expiresIn: '7d',
-            },
-        );
+        const accessToken = await this.jwt.signAsync(payload, {
+            secret: process.env.JWT_ACCESS_SECRET,
+            expiresIn: '3h',
+        });
+        const refreshToken = await this.jwt.signAsync(payload, {
+            secret: process.env.JWT_REFRESH_SECRET,
+            expiresIn: '7d',
+        });
 
         return { accessToken, refreshToken };
     }
@@ -45,7 +44,7 @@ export class AuthService {
         const user = await this.usersService.validateUser(loginDto);
 
         // generate tokens
-        const tokens = await this.getTokens(user.id);
+        const tokens = await this.getTokens(user.id, user.username);
 
         // save/update refreshToken to DB
         const hashedRT = await bcrypt.hash(tokens.refreshToken, 10);
@@ -77,7 +76,7 @@ export class AuthService {
         });
 
         //generate tokens
-        const tokens = await this.getTokens(newUser.id);
+        const tokens = await this.getTokens(newUser.id, registerDto.username);
 
         // save/update refreshToken to DB
         const hashedRT = await bcrypt.hash(tokens.refreshToken, 10);
@@ -90,7 +89,11 @@ export class AuthService {
         };
     }
 
-    async refreshTokens(userId: string, oldRefreshToken: string) {
+    async refreshTokens(
+        userId: string,
+        username: string,
+        oldRefreshToken: string,
+    ) {
         const user = await this.usersService.getRefreshTokenOfUser(userId);
         if (!user || !user.refreshToken) {
             throw new ForbiddenException('Access Denied');
@@ -102,7 +105,7 @@ export class AuthService {
         );
         if (!rtMatches) throw new ForbiddenException('Invalid refresh token');
 
-        const newTokens = await this.getTokens(userId);
+        const newTokens = await this.getTokens(userId, username);
 
         const hashed = await bcrypt.hash(newTokens.refreshToken, 10);
         await this.usersService.updateRefreshToken(userId, hashed);

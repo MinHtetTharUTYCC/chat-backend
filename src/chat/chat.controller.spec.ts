@@ -36,9 +36,7 @@ describe('ChatController', () => {
         unpinMessage: jest.fn(),
     };
 
-    const mockRequest = {
-        user: { sub: 'user-id-123' },
-    };
+    const mockRequestUser = { sub: 'user-id-123', username: 'testuser' };
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -73,10 +71,10 @@ describe('ChatController', () => {
             const mockResult = [{ id: '1' }, { id: '2' }];
             mockChatService.getAllChats.mockResolvedValue(mockResult);
 
-            const result = await controller.getAllChats(mockRequest);
+            const result = await controller.getAllChats(mockRequestUser);
 
             expect(chatService.getAllChats).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
             );
             expect(result).toEqual(mockResult);
         });
@@ -94,10 +92,10 @@ describe('ChatController', () => {
 
             mockChatService.viewChat.mockResolvedValue(mockResult);
 
-            const result = await controller.viewChat(mockRequest, chatId);
+            const result = await controller.viewChat(mockRequestUser, chatId);
 
             expect(chatService.viewChat).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatId,
             );
             expect(result).toEqual(mockResult);
@@ -110,9 +108,9 @@ describe('ChatController', () => {
             const mockResult = { id: 'new-chat-id' };
             mockChatService.startChat.mockResolvedValue(mockResult);
 
-            const result = await controller.startChat(mockRequest, dto);
+            const result = await controller.startChat(mockRequestUser, dto);
             expect(chatService.startChat).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 dto.otherUserId,
             );
             expect(result).toEqual(mockResult);
@@ -133,12 +131,12 @@ describe('ChatController', () => {
             mockMessageService.getMessages.mockResolvedValue(mockResult);
 
             const result = await controller.getMessages(
-                mockRequest,
+                mockRequestUser,
                 chatIdFromParams,
                 dto,
             );
             expect(messageService.getMessages).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatIdFromParams,
                 dto.cursor,
                 dto.limit,
@@ -155,12 +153,12 @@ describe('ChatController', () => {
             mockMessageService.sendMessage.mockResolvedValue(mockResult);
 
             const result = await controller.sendMessage(
-                mockRequest,
+                mockRequestUser,
                 chatIdFromParams,
                 dto,
             );
             expect(messageService.sendMessage).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatIdFromParams,
                 dto.content,
             );
@@ -179,12 +177,12 @@ describe('ChatController', () => {
             mockMessageService.deleteMessage.mockResolvedValue(mockResult);
 
             const result = await controller.deleteMessage(
-                mockRequest,
+                mockRequestUser,
                 chatId,
                 messageId,
             );
             expect(messageService.deleteMessage).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatId,
                 messageId,
             );
@@ -204,13 +202,13 @@ describe('ChatController', () => {
             mockMessageService.editMessage.mockResolvedValue(mockResult);
 
             const result = await controller.editMessage(
-                mockRequest,
+                mockRequestUser,
                 chatId,
                 messageId,
                 dto,
             );
             expect(messageService.editMessage).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatId,
                 messageId,
                 dto.content,
@@ -230,12 +228,12 @@ describe('ChatController', () => {
             mockMessageService.getPinnedMessages.mockResolvedValue(mockResult);
 
             const result = await controller.getPinnedMessages(
-                mockRequest,
+                mockRequestUser,
                 chatId,
                 dto,
             );
             expect(messageService.getPinnedMessages).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatId,
                 dto.cursor,
                 dto.limit,
@@ -252,12 +250,12 @@ describe('ChatController', () => {
             mockMessageService.pinMessage.mockResolvedValue(mockResult);
 
             const result = await controller.pinMessage(
-                mockRequest,
+                mockRequestUser,
                 chatId,
                 messageId,
             );
             expect(messageService.pinMessage).toHaveBeenCalledWith(
-                mockRequest.user.sub,
+                mockRequestUser.sub,
                 chatId,
                 messageId,
             );
@@ -275,12 +273,12 @@ describe('ChatController', () => {
                 mockMessageService.unpinMessage.mockResolvedValue(mockResult);
 
                 const result = await controller.unpinMessage(
-                    mockRequest,
+                    mockRequestUser,
                     chatId,
                     messageId,
                 );
                 expect(messageService.unpinMessage).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     chatId,
                     messageId,
                 );
@@ -300,12 +298,12 @@ describe('ChatController', () => {
                 mockChatService.updateChatTitle.mockResolvedValue(mockResult);
 
                 const result = await controller.updateChatTitle(
-                    mockRequest,
+                    mockRequestUser,
                     chatId,
                     dto,
                 );
                 expect(chatService.updateChatTitle).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     chatId,
                     dto.title,
                 );
@@ -328,11 +326,11 @@ describe('ChatController', () => {
                 mockChatService.createGroupChat.mockResolvedValue(mockResult);
 
                 const result = await controller.createGroupChat(
-                    mockRequest,
+                    mockRequestUser,
                     dto,
                 );
                 expect(chatService.createGroupChat).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     dto.title,
                     dto.userIds,
                 );
@@ -352,12 +350,12 @@ describe('ChatController', () => {
                 mockChatService.addToGroupChat.mockResolvedValue(mockResult);
 
                 const result = await controller.addToGroupChat(
-                    mockRequest,
+                    mockRequestUser,
                     chatId,
                     dto,
                 );
                 expect(chatService.addToGroupChat).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     chatId,
                     dto.userIds,
                 );
@@ -374,9 +372,12 @@ describe('ChatController', () => {
                 };
                 mockChatService.joinGroup.mockResolvedValue(mockResult);
 
-                const result = await controller.joinGroup(mockRequest, chatId);
+                const result = await controller.joinGroup(
+                    mockRequestUser,
+                    chatId,
+                );
                 expect(chatService.joinGroup).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     chatId,
                 );
                 expect(result).toEqual(mockResult);
@@ -392,9 +393,12 @@ describe('ChatController', () => {
                 };
                 mockChatService.leaveGroup.mockResolvedValue(mockResult);
 
-                const result = await controller.leaveGroup(mockRequest, chatId);
+                const result = await controller.leaveGroup(
+                    mockRequestUser,
+                    chatId,
+                );
                 expect(chatService.leaveGroup).toHaveBeenCalledWith(
-                    mockRequest.user.sub,
+                    mockRequestUser.sub,
                     chatId,
                 );
                 expect(result).toEqual(mockResult);

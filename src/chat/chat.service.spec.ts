@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
+import { create } from 'domain';
 
 describe('ChatService', () => {
     let service: ChatService;
@@ -182,7 +183,10 @@ describe('ChatService', () => {
         const mockResult = {
             id: 'chat_g_456',
             isGroup: true,
+            title: 'Group Chat',
+            createdAt: new Date(),
             participants: [],
+            isParticipant: true,
         };
 
         beforeEach(() => {
@@ -265,7 +269,6 @@ describe('ChatService', () => {
             expect(databaseService.chat.findUnique).toHaveBeenCalled();
             expect(result).toEqual({
                 chat: mockGroupChatResut,
-                isNewGroupChat: true,
             });
         });
     });

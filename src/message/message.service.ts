@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
+import { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { ChatGateway } from 'src/chat/chat.gateway';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
@@ -396,14 +397,11 @@ export class MessageService {
                 ),
         );
 
-        return {
-            success: true,
-            message: 'Successfully deleted the message',
-        };
+        return { messageId, chatId };
     }
 
     async editMessage(
-        userId: string,
+        me: RequestUser,
         chatId: string,
         messageId: string,
         content: string,
@@ -413,7 +411,7 @@ export class MessageService {
                 // Check membership first
                 tx.participant.findUnique({
                     where: {
-                        userId_chatId: { userId, chatId },
+                        userId_chatId: { userId: me.sub, chatId },
                     },
                     select: { id: true },
                 }),
@@ -421,7 +419,7 @@ export class MessageService {
                 tx.message.findFirst({
                     where: {
                         id: messageId,
-                        senderId: userId,
+                        senderId: me.sub,
                         chatId: chatId,
                     },
                     select: { id: true, content: true },
@@ -447,9 +445,6 @@ export class MessageService {
                         id: true,
                         content: true,
                         chatId: true,
-                        senderId: true,
-                        createdAt: true,
-                        updatedAt: true,
                     },
                 }),
                 tx.participant.findMany({
@@ -461,10 +456,19 @@ export class MessageService {
             return { updatedMessage, participants };
         });
 
-        this.chatGateway.server.to(`chat_${chatId}`).emit('message_updated', {
+        const payload = {
             messageId,
+            chatId,
             content: result.updatedMessage.content,
-        });
+            actor: {
+                id: me.sub,
+                usename: me.username,
+            },
+        };
+
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('message_edited', payload);
 
         const cacheKeys = [
             `chat:${chatId}:messages`,
@@ -479,7 +483,11 @@ export class MessageService {
                 ),
         );
 
-        return result.updatedMessage;
+        return {
+            messageId,
+            chatId,
+            content: result.updatedMessage.content,
+        };
     }
 
     async getPinnedMessages(
@@ -520,9 +528,9 @@ export class MessageService {
                     },
                     select: {
                         id: true,
-                        createdAt: true,
-                        pinnedByUserId: true,
+                        chatId: true,
                         messageId: true,
+                        pinnedByUserId: true,
                         user: {
                             select: {
                                 id: true,
@@ -533,9 +541,10 @@ export class MessageService {
                             select: {
                                 id: true,
                                 content: true,
-                                senderId: true, // Might be useful
+                                senderId: true, //used at frontend
                             },
                         },
+                        createdAt: true,
                     },
                 }),
             ]);
@@ -576,7 +585,12 @@ export class MessageService {
         return response;
     }
 
-    async pinMessage(userId: string, chatId: string, messageId: string) {
+    async pinMessage(
+        userId: string,
+        username: string,
+        chatId: string,
+        messageId: string,
+    ) {
         const startTime = Date.now();
         console.log('🔍 [PIN] Starting pinMessage');
 
@@ -595,6 +609,7 @@ export class MessageService {
                     where: { id: messageId, chatId },
                     select: {
                         id: true,
+                        content: true,
                         senderId: true,
                         sender: {
                             select: { id: true, username: true },
@@ -652,23 +667,15 @@ export class MessageService {
             if (!chatInfo) throw new NotFoundException('Chat not found');
             // Build socket payload with already-fetched data
             const socketPayload = {
-                type: NotificationType.MESSAGE_PINNED,
-                data: {
-                    ...pinMessage,
-                    user: pinnedByUser,
-                    message: {
-                        id: messageId,
-                        senderId: message.senderId,
-                        sender: message.sender, // Already fetched!
-                    },
-                    chat: {
-                        isGroup: chatInfo.isGroup,
-                    },
+                chatId,
+                messageId: message.id,
+                actor: {
+                    id: userId,
+                    username,
                 },
-                timestamp: new Date(),
             };
 
-            // ✅ Fire socket events + notification in background
+            // Fire socket events + notification in background
             const t3 = Date.now();
 
             if (chatInfo.isGroup) {
@@ -677,16 +684,14 @@ export class MessageService {
                     .emit('pin_added', socketPayload);
 
                 if (message.senderId !== userId) {
-                    // this.chatGateway.server
-                    //     .to(`chat_${chatId}`)
-                    //     .emit('notification_new', socketPayload);
-
                     // Background notification (fire-and-forget)
                     this.notificationService
                         .createNotification(userId, chatId, {
                             receiverId: message.senderId,
                             type: NotificationType.MESSAGE_PINNED,
-                            pinnedId: pinMessage.id,
+                            data: {
+                                messageId,
+                            },
                         })
                         .catch((err) =>
                             console.error('📬 Notification error:', err),
@@ -700,16 +705,14 @@ export class MessageService {
                         .to(`chat_${chatId}`)
                         .emit('pin_added', socketPayload);
 
-                    this.chatGateway.server
-                        .to(`user_${otherParticipant.userId}`)
-                        .emit('notification_new', socketPayload);
-
                     // Background notification (fire-and-forget)
                     this.notificationService
                         .createNotification(userId, chatId, {
                             receiverId: otherParticipant.userId,
                             type: NotificationType.MESSAGE_PINNED,
-                            pinnedId: pinMessage.id,
+                            data: {
+                                messageId,
+                            },
                         })
                         .catch((err) =>
                             console.error('📬 Notification error:', err),
@@ -718,7 +721,7 @@ export class MessageService {
             }
             console.log(`⏱️ [PIN] Socket events: ${Date.now() - t3}ms`);
 
-            // ✅ Clear cache (parallel if possible)
+            // Clear cache (parallel if possible)
             const t4 = Date.now();
             await Promise.all([
                 this.redisService.del(`chat:${chatId}:messages`),
@@ -730,7 +733,7 @@ export class MessageService {
             const totalTime = Date.now() - startTime;
             console.log(`✅ [PIN] TOTAL TIME: ${totalTime}ms`);
 
-            return { success: true };
+            return { messageId, chatId };
         } catch (error) {
             console.log(`❌ [PIN] Error after ${Date.now() - startTime}ms`);
             if (error instanceof PrismaClientKnownRequestError) {
@@ -793,9 +796,7 @@ export class MessageService {
                 },
             });
 
-            return {
-                success: true,
-            };
+            return { messageId, chatId };
         });
         console.log(`[UNPIN] Transaction (all DB ops): ${Date.now() - t1}ms`);
 

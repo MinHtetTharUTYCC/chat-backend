@@ -40,6 +40,8 @@ model Chat {
   messages       Message[]
   pinnedMessages PinnedMessage[]
   notifications  Notification[]
+
+  dmKey String? @unique
 }
 
 model Participant {
@@ -98,7 +100,6 @@ model Notification {
   receiverId String
   actorId    String
   type       NotificationType
-  pinnedId   String?
   data       Json? //extra meta data(messageId, some preveiw,etc)
   isRead     Boolean          @default(false)
   createdAt  DateTime         @default(now())
@@ -111,5 +112,7 @@ model Notification {
 enum NotificationType {
   NEW_CHAT
   GROUP_ADDED
+  GROUP_INVITED
   MESSAGE_PINNED
+  TITLE_UPDATED
 }

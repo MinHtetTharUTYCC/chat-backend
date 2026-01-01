@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
+import { AllExceptionsFilter } from './exceptions/http-exception.filter';
 
 // import {}from "@nestjs/swagger"
 
@@ -16,6 +17,8 @@ async function bootstrap() {
         origin: process.env.FRONTEND_URL || 'http://localhost:9000',
         credentials: true,
     });
+
+    app.useGlobalFilters(new AllExceptionsFilter());
 
     const config = new DocumentBuilder()
         .setTitle('Chat Backend API')

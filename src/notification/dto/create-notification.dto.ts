@@ -16,10 +16,6 @@ export class CreateNotificationDto {
     @IsEnum(NotificationType)
     type: NotificationType;
 
-    @IsString()
-    @IsOptional()
-    pinnedId?: string;
-
     @IsOptional()
     @IsObject()
     data?: Record<string, any>;

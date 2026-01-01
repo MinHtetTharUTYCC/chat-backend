@@ -624,6 +624,70 @@
         ]
       }
     },
+    "/chats/{chatId}/participants/invite": {
+      "post": {
+        "operationId": "ChatController_inviteToGroup",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteToChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/invite-users": {
+      "get": {
+        "operationId": "ChatController_searchUsersToInvite",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
     "/chats/{chatId}/participants/join-group": {
       "post": {
         "operationId": "ChatController_joinGroup",
@@ -948,6 +1012,25 @@
         "properties": {
           "userIds": {
             "description": "Array of user IDs to add to the chat",
+            "example": [
+              "user-id-1",
+              "user-id-2"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userIds"
+        ]
+      },
+      "InviteToChatDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "description": "Array of user ids to invite to the chat",
             "example": [
               "user-id-1",
               "user-id-2"
