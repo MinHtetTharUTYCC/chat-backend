@@ -107,55 +107,6 @@ export class UsersService {
         return user;
     }
 
-    // async viewUser(userId: string, viewUserId: string) {
-    //     const [user, chat] = await Promise.all([
-    //         this.databaseService.user.findUnique({
-    //             where: { id: viewUserId },
-    //             select: {
-    //                 id: true,
-    //                 username: true,
-    //                 createdAt: true,
-    //             },
-    //         }),
-    //         await this.databaseService.chat.findFirst({
-    //             where: {
-    //                 isGroup: false,
-    //                 AND: [
-    //                     { participants: { some: { userId } } },
-    //                     { participants: { some: { userId: viewUserId } } },
-    //                 ],
-    //             },
-    //             select: {
-    //                 id: true,
-    //             },
-    //         }),
-    //     ]);
-
-    //     if (!user) throw new NotFoundException('User not found');
-
-    //     return {
-    //         user,
-    //         chatId: chat?.id || null, //to go/redirect if chat exists
-    //     };
-    // }
-
-    async viewUser(viewUserId: string) {
-        const user = await this.databaseService.user.findUnique({
-            where: { id: viewUserId },
-            select: {
-                id: true,
-                username: true,
-            },
-        });
-
-        if (!user) throw new NotFoundException('User not found');
-
-        return {
-            id: user.id,
-            username: user.username,
-        };
-    }
-
     async updateUser(userId: string, dto: UpdateUserDto) {
         const user = await this.databaseService.user.update({
             where: { id: userId },
@@ -180,26 +131,7 @@ export class UsersService {
                 id: {
                     not: userId,
                 },
-                username: {
-                    contains: query,
-                    mode: 'insensitive',
-                },
-            },
-            select: {
-                id: true,
-                username: true,
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-    }
-    async getAllUsers(userId: string) {
-        return this.databaseService.user.findMany({
-            where: {
-                id: {
-                    not: userId,
-                },
+                username: { contains: query, mode: 'insensitive' },
             },
             select: {
                 id: true,
