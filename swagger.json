@@ -15,20 +15,6 @@
         ]
       }
     },
-    "/cats": {
-      "get": {
-        "operationId": "CatsConroller_getCats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "CatsConroller"
-        ]
-      }
-    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",

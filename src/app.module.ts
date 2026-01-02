@@ -13,7 +13,6 @@ import { SearchModule } from './search/search.module';
 import { NotificationModule } from './notification/notification.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { CatsConroller } from './cats/cats.controller';
 
 @Module({
     imports: [
@@ -36,7 +35,7 @@ import { CatsConroller } from './cats/cats.controller';
         SearchModule,
         NotificationModule,
     ],
-    controllers: [AppController, CatsConroller],
+    controllers: [AppController],
     providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

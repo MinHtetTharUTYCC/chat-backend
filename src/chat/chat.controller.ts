@@ -29,7 +29,6 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
-@UseGuards(ThrottlerGuard)
 export class ChatController {
     constructor(
         private readonly chatService: ChatService,

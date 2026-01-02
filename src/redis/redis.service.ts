@@ -20,6 +20,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             maxRetriesPerRequest: 3,
         };
 
+        if (!redisConfig.password) {
+            console.warn('WARN:: REDIS_PASSWORD not configured!');
+        }
+
         console.log(
             `🔌 Connecting to Redis at ${redisConfig.host}:${redisConfig.port}`,
         );
@@ -50,7 +54,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     async onModuleDestroy() {
         //.quit() is safer than .disconnect()
         //waits for pending commands to finish before closing
-        this.client.quit();
+        await this.client.quit();
         console.log('❌ Redis connection closed gracefully');
     }
 
@@ -83,20 +87,4 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     async exists(key: string): Promise<number> {
         return this.client.exists(key);
     }
-
-    // async expire(key: string, seconds: number): Promise<number> {
-    //     return this.client.expire(key, seconds);
-    // }
-
-    // async hset(key: string, field: string, value: string): Promise<number> {
-    //     return this.client.hset(key, field, value);
-    // }
-
-    // async hget(key: string, field: string): Promise<string | null> {
-    //     return this.client.hget(key, field);
-    // }
-
-    // async hgetall(key: string): Promise<Record<string, string>> {
-    //     return this.client.hgetall(key);
-    // }
 }

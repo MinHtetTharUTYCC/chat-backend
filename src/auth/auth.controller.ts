@@ -31,7 +31,7 @@ export class AuthController {
         const { accessToken, refreshToken, user } =
             await this.authService.login(dto);
 
-        // set refres tokens only in httpOnly cookie
+        // set refresh tokens only in httpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -69,7 +69,7 @@ export class AuthController {
         };
     }
 
-    @Throttle({ default: { ttl: 60000, limit: 30 } })
+    @Throttle({ default: { ttl: 60000, limit: 10 } })
     @Post('/refresh')
     @UseGuards(JwtRefreshGuard)
     async refresh(
@@ -93,6 +93,7 @@ export class AuthController {
         return { accessToken };
     }
 
+    @Throttle({ default: { ttl: 60000, limit: 10 } })
     @Post('/logout')
     @UseGuards(JwtAuthGuard)
     async logout(
