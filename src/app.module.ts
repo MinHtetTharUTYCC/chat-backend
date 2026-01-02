@@ -11,10 +11,21 @@ import { PresenceModule } from './presence/presence.module';
 import { RedisModule } from './redis/redis.module';
 import { SearchModule } from './search/search.module';
 import { NotificationModule } from './notification/notification.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { CatsConroller } from './cats/cats.controller';
 
 @Module({
     imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        ThrottlerModule.forRoot({
+            throttlers: [
+                {
+                    ttl: 60000,
+                    limit: 200,
+                },
+            ],
+        }),
         AuthModule,
         UsersModule,
         DatabaseModule,
@@ -25,7 +36,7 @@ import { NotificationModule } from './notification/notification.module';
         SearchModule,
         NotificationModule,
     ],
-    controllers: [AppController],
-    providers: [AppService],
+    controllers: [AppController, CatsConroller],
+    providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

@@ -6,18 +6,19 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import { AllExceptionsFilter } from './exceptions/http-exception.filter';
 
-// import {}from "@nestjs/swagger"
-
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
         logger: ['error', 'warn', 'debug', 'verbose', 'log'],
     });
+
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
     app.enableCors({
         origin: process.env.FRONTEND_URL || 'http://localhost:9000',
         credentials: true,
     });
 
+    app.use(cookieParser());
     app.useGlobalFilters(new AllExceptionsFilter());
 
     const config = new DocumentBuilder()
@@ -37,7 +38,6 @@ async function bootstrap() {
         res.send(document);
     });
 
-    app.use(cookieParser());
     await app.listen(process.env.PORT ?? 7000);
 }
 bootstrap();

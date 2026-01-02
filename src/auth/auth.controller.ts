@@ -15,11 +15,13 @@ import express from 'express';
 import { RegisterDto } from './dto/register.dto';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
+    @Throttle({ default: { ttl: 60000, limit: 5 } })
     @HttpCode(HttpStatus.OK)
     @Post('/login')
     async login(
@@ -43,6 +45,7 @@ export class AuthController {
         };
     }
 
+    @Throttle({ default: { ttl: 60000, limit: 3 } })
     @HttpCode(HttpStatus.CREATED)
     @Post('/register')
     async register(
@@ -66,6 +69,7 @@ export class AuthController {
         };
     }
 
+    @Throttle({ default: { ttl: 60000, limit: 30 } })
     @Post('/refresh')
     @UseGuards(JwtRefreshGuard)
     async refresh(

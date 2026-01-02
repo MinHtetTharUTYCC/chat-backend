@@ -15,6 +15,20 @@
         ]
       }
     },
+    "/cats": {
+      "get": {
+        "operationId": "CatsConroller_getCats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CatsConroller"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -91,20 +105,6 @@
         ]
       }
     },
-    "/users": {
-      "get": {
-        "operationId": "UsersController_getAllUsers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Users"
-        ]
-      }
-    },
     "/users/me": {
       "get": {
         "operationId": "UsersController_getMe",
@@ -145,29 +145,6 @@
       "get": {
         "operationId": "UsersController_searchUsers",
         "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Users"
-        ]
-      }
-    },
-    "/users/{viewUserId}": {
-      "get": {
-        "operationId": "UsersController_viewUser",
-        "parameters": [
-          {
-            "name": "viewUserId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": ""
@@ -824,7 +801,7 @@
     },
     "/search": {
       "get": {
-        "operationId": "SearchController_searchGlobal",
+        "operationId": "SearchController_searchChats",
         "parameters": [],
         "responses": {
           "200": {

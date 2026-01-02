@@ -25,9 +25,11 @@ import { MessagesPaginationDto } from './dto/messages-pagination.dto';
 import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { ReqUser } from 'src/auth/request-user.decorator';
 import { InviteToChatDto } from './dto/invite-to-chat.dto';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
+@UseGuards(ThrottlerGuard)
 export class ChatController {
     constructor(
         private readonly chatService: ChatService,
