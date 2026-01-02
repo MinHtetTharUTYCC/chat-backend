@@ -7,7 +7,6 @@ import {
     Req,
     Res,
     UseGuards,
-    ValidationPipe,
 } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
@@ -25,7 +24,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post('/login')
     async login(
-        @Body(ValidationPipe) dto: LoginDto,
+        @Body() dto: LoginDto,
         @Res({ passthrough: true }) res: express.Response,
     ) {
         const { accessToken, refreshToken, user } =
@@ -49,7 +48,7 @@ export class AuthController {
     @HttpCode(HttpStatus.CREATED)
     @Post('/register')
     async register(
-        @Body(ValidationPipe) dto: RegisterDto,
+        @Body() dto: RegisterDto,
         @Res({ passthrough: true }) res: express.Response,
     ) {
         const { accessToken, refreshToken, user } =

@@ -1,12 +1,4 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Patch,
-    Query,
-    UseGuards,
-    ValidationPipe,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -25,17 +17,14 @@ export class UsersController {
     }
 
     @Patch('/me')
-    async updateUser(
-        @ReqUser() me: RequestUser,
-        @Body(ValidationPipe) dto: UpdateUserDto,
-    ) {
+    async updateUser(@ReqUser() me: RequestUser, @Body() dto: UpdateUserDto) {
         return this.usersService.updateUser(me.sub, dto);
     }
 
     @Get('/search')
     async searchUsers(
         @ReqUser() me: RequestUser,
-        @Query(ValidationPipe) dto: SearchQueryDto,
+        @Query() dto: SearchQueryDto,
     ) {
         return this.usersService.searchUsers(me.sub, dto.q);
     }

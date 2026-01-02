@@ -1,5 +1,11 @@
 import { Transform } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsString, MaxLength } from 'class-validator';
+import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
+    IsString,
+    MaxLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateGroupChatDto {
@@ -18,10 +24,11 @@ export class CreateGroupChatDto {
     @ApiProperty({
         description: 'Array of user IDs to include in the group chat',
         type: [String],
-        example: ['user-id-1', 'user-id-2', 'user-id-3'],
+        example: ['userid1', 'userid2', 'userid3'],
     })
     @IsArray()
     @IsString({ each: true })
     @ArrayMinSize(1)
+    @ArrayMaxSize(100)
     userIds: string[];
 }

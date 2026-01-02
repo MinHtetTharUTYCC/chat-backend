@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import { AllExceptionsFilter } from './exceptions/http-exception.filter';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -20,6 +21,13 @@ async function bootstrap() {
 
     app.use(cookieParser());
     app.useGlobalFilters(new AllExceptionsFilter());
+    app.useGlobalPipes(
+        new ValidationPipe({
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
+        }),
+    );
 
     const config = new DocumentBuilder()
         .setTitle('Chat Backend API')

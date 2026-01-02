@@ -9,7 +9,6 @@ import {
     Query,
     Req,
     UseGuards,
-    ValidationPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
@@ -25,7 +24,6 @@ import { MessagesPaginationDto } from './dto/messages-pagination.dto';
 import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { ReqUser } from 'src/auth/request-user.decorator';
 import { InviteToChatDto } from './dto/invite-to-chat.dto';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
@@ -46,10 +44,7 @@ export class ChatController {
     }
 
     @Post('/start')
-    async startChat(
-        @Req() req,
-        @Body(ValidationPipe) startChatDto: StartChatDto,
-    ) {
+    async startChat(@Req() req, @Body() startChatDto: StartChatDto) {
         return this.chatService.startChat(
             req.user.sub,
             startChatDto.otherUserId,
@@ -60,7 +55,7 @@ export class ChatController {
     async getMessages(
         @Req() req,
         @Param('chatId') chatId: string,
-        @Query(new ValidationPipe({ transform: true }))
+        @Query()
         query: MessagesPaginationDto,
     ) {
         return this.messageService.getMessages(
@@ -80,7 +75,7 @@ export class ChatController {
     async sendMessage(
         @Req() req,
         @Param('chatId') chatId: string,
-        @Body(ValidationPipe) sendMessageDto: SendMessageDto,
+        @Body() sendMessageDto: SendMessageDto,
     ) {
         return this.messageService.sendMessage(
             req.user.sub,
@@ -113,7 +108,7 @@ export class ChatController {
         @ReqUser() me: RequestUser,
         @Param('chatId') chatId: string,
         @Param('messageId') messageId: string,
-        @Body(ValidationPipe) dto: EditMessageDto,
+        @Body() dto: EditMessageDto,
     ) {
         return this.messageService.editMessage(
             me,
@@ -129,7 +124,7 @@ export class ChatController {
     async getPinnedMessages(
         @ReqUser() user: RequestUser,
         @Param('chatId') chatId: string,
-        @Query(new ValidationPipe({ transform: true })) dto: PaginationDto,
+        @Query() dto: PaginationDto,
     ) {
         return this.messageService.getPinnedMessages(
             user.sub,
@@ -172,7 +167,7 @@ export class ChatController {
     async updateChatTitle(
         @ReqUser() me: RequestUser,
         @Param('chatId') chatId: string,
-        @Body(ValidationPipe) dto: UpdateChatTitleDto,
+        @Body() dto: UpdateChatTitleDto,
     ) {
         return this.chatService.updateChatTitle(me, chatId, dto.title);
     }
@@ -180,7 +175,7 @@ export class ChatController {
     @Post('/create-group')
     async createGroupChat(
         @ReqUser() me: RequestUser,
-        @Body(ValidationPipe) dto: CreateGroupChatDto,
+        @Body() dto: CreateGroupChatDto,
     ) {
         return this.chatService.createGroupChat(me, dto.title, dto.userIds);
     }
@@ -189,7 +184,7 @@ export class ChatController {
     async addToGroupChat(
         @ReqUser() me: RequestUser,
         @Param('chatId') chatId: string,
-        @Body(ValidationPipe) dto: AddToChatDto,
+        @Body() dto: AddToChatDto,
     ) {
         return this.chatService.addToGroupChat(me, chatId, dto.userIds);
     }
@@ -198,7 +193,7 @@ export class ChatController {
     async inviteToGroup(
         @ReqUser() me: RequestUser,
         @Param('chatId') chatId: string,
-        @Body(ValidationPipe) dto: InviteToChatDto,
+        @Body() dto: InviteToChatDto,
     ) {
         return this.chatService.inviteToGroupChat(me, chatId, dto.userIds);
     }

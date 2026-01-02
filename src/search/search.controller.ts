@@ -1,11 +1,4 @@
-import {
-    Controller,
-    Get,
-    Param,
-    Query,
-    UseGuards,
-    ValidationPipe,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { SearchService } from './search.service';
 import { SearchQueryDto } from './dto/search.dto';
@@ -20,7 +13,7 @@ export class SearchController {
     @Get('/')
     async searchChats(
         @ReqUser() me: RequestUser,
-        @Query(ValidationPipe) dto: SearchQueryDto,
+        @Query() dto: SearchQueryDto,
     ) {
         return this.searchService.searchChats(me.sub, dto.q);
     }
@@ -29,7 +22,7 @@ export class SearchController {
     async searchInMessages(
         @ReqUser() me: RequestUser,
         @Param('chatId') chatId: string,
-        @Query(ValidationPipe) dto: SearchQueryDto,
+        @Query() dto: SearchQueryDto,
     ) {
         return this.searchService.searchMessageInChat(me.sub, chatId, dto.q);
     }
