@@ -1,10 +1,16 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+    Injectable,
+    OnModuleDestroy,
+    OnModuleInit,
+    Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
     public client: Redis;
+    private readonly logger = new Logger(RedisService.name);
 
     constructor(private configService: ConfigService) {}
 
@@ -21,33 +27,33 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         };
 
         if (!redisConfig.password) {
-            console.warn('WARN:: REDIS_PASSWORD not configured!');
+            this.logger.warn('REDIS_PASSWORD not configured!');
         }
 
-        console.log(
-            `🔌 Connecting to Redis at ${redisConfig.host}:${redisConfig.port}`,
+        this.logger.log(
+            `Connecting to Redis at ${redisConfig.host}:${redisConfig.port}`,
         );
 
         this.client = new Redis(redisConfig);
 
         this.client.on('connect', () => {
-            console.log('✅ Redis connected');
+            this.logger.log('Redis connected');
         });
 
         this.client.on('ready', () => {
-            console.log('✅ Redis client ready');
+            this.logger.log('Redis client ready');
         });
 
         this.client.on('error', (err) => {
-            console.error('❌ Redis Client Error:', err);
+            this.logger.error('Redis Client Error:', err);
         });
 
         //test connection
         try {
             await this.client.ping();
-            console.log('✅ Redis PING successful');
+            this.logger.log('Redis PING successful');
         } catch (error) {
-            console.error('❌ Redis PING failed:', error);
+            this.logger.error('Redis PING failed:', error);
         }
     }
 
@@ -55,14 +61,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         //.quit() is safer than .disconnect()
         //waits for pending commands to finish before closing
         await this.client.quit();
-        console.log('❌ Redis connection closed gracefully');
+        this.logger.log('Redis connection closed gracefully');
     }
 
     async get(key: string): Promise<string | null> {
         try {
             return await this.client.get(key);
         } catch (error) {
-            console.log('Failed to get key: ', key);
+            this.logger.error(`Failed to get key: ${key}`, error);
             throw error;
         }
     }
@@ -75,7 +81,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
                 await this.client.set(key, value);
             }
         } catch (error) {
-            console.log('Failed to set key: ', key);
+            this.logger.error(`Failed to set key: ${key}`, error);
             throw error;
         }
     }

@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class PresenceService {
+    private readonly logger = new Logger(PresenceService.name);
+
     // private onlineUsers = new Set<string>();
     constructor(private readonly redisService: RedisService) {}
 
@@ -85,7 +87,6 @@ export class PresenceService {
         });
 
         const results = await pipeline.exec();
-        console.log(results);
 
         if (!results) {
             return {};
@@ -100,8 +101,6 @@ export class PresenceService {
             // Redis pipeline returns [error, result] tuples
             const onlineResult = results[i * 2]?.[1];
             const lastSeenResult = results[i * 2 + 1]?.[1];
-
-            console.log('+++', i, onlineResult, lastSeenResult);
 
             // values with type checking
             const onlineValue = onlineResult as string | null;

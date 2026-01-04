@@ -25,14 +25,13 @@ export class NotificationService {
         cursor?: string,
         limit: number = 20,
     ) {
-        const safeLimitValue = Math.min(limit, 100); // Cap at 100
         const notifications = await this.databaseService.notification.findMany({
             where: {
                 receiverId: userId,
             },
             skip: cursor ? 1 : 0,
             cursor: cursor ? { id: cursor } : undefined,
-            take: safeLimitValue,
+            take: limit,
             orderBy: {
                 createdAt: 'desc',
             },

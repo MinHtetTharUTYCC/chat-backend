@@ -1,10 +1,6 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
-  // Enable query optimization
-  // previewFeatures = ["fullTextSearch", "fullTextIndex"]
-  // Generate optimized binary
-  // binaryTargets = ["native"]
 }
 
 datasource db {
@@ -42,6 +38,8 @@ model Chat {
   notifications  Notification[]
 
   dmKey String? @unique
+
+  @@index([lastMessageAt])
 }
 
 model Participant {
@@ -72,7 +70,7 @@ model Message {
   pinnedMessages PinnedMessage[]
 
   @@index([chatId, id])
-  @@index([chatId, createdAt]) // For sorting by date
+  @@index([chatId, createdAt])
   @@index([senderId])
 }
 
@@ -107,6 +105,10 @@ model Notification {
   receiver User @relation(name: "ReceiverRelation", fields: [receiverId], references: [id], onDelete: Cascade)
   actor    User @relation(name: "ActorRelation", fields: [actorId], references: [id], onDelete: Cascade)
   chat     Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId])
+  @@index([receiverId, createdAt])
+  @@index([chatId])
 }
 
 enum NotificationType {

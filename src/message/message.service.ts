@@ -2,6 +2,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
@@ -14,6 +15,8 @@ import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class MessageService {
+    private readonly logger = new Logger(MessageService.name);
+
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly chatGateway: ChatGateway,
@@ -22,8 +25,6 @@ export class MessageService {
     ) {}
 
     async sendMessage(userId: string, chatId: string, content: string) {
-        await this.verifyMembership(userId, chatId);
-
         const result = await this.databaseService.$transaction(async (tx) => {
             const [membership, participantIds] = await Promise.all([
                 tx.participant.findUnique({
@@ -84,23 +85,17 @@ export class MessageService {
             .emit('new_message', result.newMessage);
 
         // invalidate cache
-        const cacheKeys = [
+        const keysToDelete = [
             `chat:${chatId}:messages`,
             ...result.participantIds.map((p) => `user:${p.userId}:chats`),
         ];
 
         // fire and forgot
-        cacheKeys.forEach(
-            (key) =>
-                void this.redisService
-                    .del(key)
-                    .catch((err) =>
-                        console.error(
-                            `Cache invalidation error for key${key}:`,
-                            err,
-                        ),
-                    ),
-        );
+        this.redisService
+            .del(...keysToDelete)
+            .catch((err) =>
+                this.logger.error('Cache invalidation error: ', err),
+            );
 
         return result.newMessage;
     }
@@ -133,7 +128,7 @@ export class MessageService {
             const cachedResult = cacheded ? JSON.parse(cacheded) : null;
 
             if (cachedResult) {
-                console.log('Returning messages + meta from cache...');
+                this.logger.debug('Returning messages + meta from cache...');
                 return cachedResult;
             }
         }
@@ -327,7 +322,7 @@ export class MessageService {
 
         // Cache only initial load
         if (!activeCursor && !jumpingToMessage && !jumpingToDate) {
-            console.log('Setting value...');
+            this.logger.debug('Setting messages cache...');
             await this.redisService.set(
                 latestMessageKey,
                 JSON.stringify(response),
@@ -391,8 +386,9 @@ export class MessageService {
             this.redisService
                 .del(key)
                 .catch((err) =>
-                    console.error(
-                        `Error deleting cache for key ${key}: ${err}`,
+                    this.logger.error(
+                        `Error deleting cache for key ${key}:`,
+                        err,
                     ),
                 ),
         );
@@ -479,7 +475,7 @@ export class MessageService {
             this.redisService
                 .del(key)
                 .catch((err) =>
-                    console.error(`Error deleting cache key ${key}: ${err}`),
+                    this.logger.error(`Error deleting cache key ${key}:`, err),
                 ),
         );
 
@@ -503,7 +499,7 @@ export class MessageService {
             const cachedResult = cached ? JSON.parse(cached) : null;
 
             if (cachedResult) {
-                console.log('Returning pinned messages from cache...');
+                this.logger.debug('Returning pinned messages from cache...');
                 return cachedResult;
             }
         }
@@ -579,7 +575,7 @@ export class MessageService {
                     JSON.stringify(response),
                     1800, //30 minutes
                 )
-                .catch((err) => console.error('Cache Set Error', err));
+                .catch((err) => this.logger.error('Cache Set Error', err));
         }
 
         return response;
@@ -592,9 +588,8 @@ export class MessageService {
         messageId: string,
     ) {
         const startTime = Date.now();
-        console.log('🔍 [PIN] Starting pinMessage');
+        this.logger.debug('[PIN] Starting pinMessage');
 
-        // ✅ MEGA OPTIMIZATION: Combine ALL initial checks into ONE parallel batch
         const t1 = Date.now();
         const [membershipResult, message, chatInfo, pinnedByUser] =
             await Promise.all([
@@ -636,7 +631,7 @@ export class MessageService {
                     select: { id: true, username: true },
                 }),
             ]);
-        console.log(`⏱️ [PIN] ALL parallel checks: ${Date.now() - t1}ms`);
+        this.logger.debug(`[PIN] ALL parallel checks: ${Date.now() - t1}ms`);
 
         // Validate results
         if (!membershipResult) {
@@ -647,7 +642,7 @@ export class MessageService {
         }
 
         try {
-            // ✅ Create pin (lean)
+            // Create pin (lean)
             const t2 = Date.now();
             const pinMessage = await this.databaseService.pinnedMessage.create({
                 data: {
@@ -662,10 +657,12 @@ export class MessageService {
                     messageId: true,
                 },
             });
-            console.log(`⏱️ [PIN] pinnedMessage.create: ${Date.now() - t2}ms`);
+            this.logger.debug(
+                `[PIN] pinnedMessage.create: ${Date.now() - t2}ms`,
+            );
 
             if (!chatInfo) throw new NotFoundException('Chat not found');
-            // Build socket payload with already-fetched data
+
             const socketPayload = {
                 chatId,
                 messageId: message.id,
@@ -684,7 +681,7 @@ export class MessageService {
                     .emit('pin_added', socketPayload);
 
                 if (message.senderId !== userId) {
-                    // Background notification (fire-and-forget)
+                    // (fire-and-forget)
                     this.notificationService
                         .createNotification(userId, chatId, {
                             receiverId: message.senderId,
@@ -694,7 +691,7 @@ export class MessageService {
                             },
                         })
                         .catch((err) =>
-                            console.error('📬 Notification error:', err),
+                            this.logger.error('Notification error:', err),
                         );
                 }
             } else {
@@ -705,7 +702,7 @@ export class MessageService {
                         .to(`chat_${chatId}`)
                         .emit('pin_added', socketPayload);
 
-                    // Background notification (fire-and-forget)
+                    // (fire-and-forget)
                     this.notificationService
                         .createNotification(userId, chatId, {
                             receiverId: otherParticipant.userId,
@@ -715,11 +712,11 @@ export class MessageService {
                             },
                         })
                         .catch((err) =>
-                            console.error('📬 Notification error:', err),
+                            this.logger.error('Notification error:', err),
                         );
                 }
             }
-            console.log(`⏱️ [PIN] Socket events: ${Date.now() - t3}ms`);
+            this.logger.debug(`[PIN] Socket events: ${Date.now() - t3}ms`);
 
             // Clear cache (parallel if possible)
             const t4 = Date.now();
@@ -728,14 +725,17 @@ export class MessageService {
                 this.redisService.del(`chat:${chatId}:messages:pinned`),
             ]);
 
-            console.log(`⏱️ [PIN] Redis del: ${Date.now() - t4}ms`);
+            this.logger.debug(`[PIN] Redis del: ${Date.now() - t4}ms`);
 
             const totalTime = Date.now() - startTime;
-            console.log(`✅ [PIN] TOTAL TIME: ${totalTime}ms`);
+            this.logger.log(`[PIN] TOTAL TIME: ${totalTime}ms`);
 
             return { messageId, chatId };
         } catch (error) {
-            console.log(`❌ [PIN] Error after ${Date.now() - startTime}ms`);
+            this.logger.error(
+                `[PIN] Error after ${Date.now() - startTime}ms`,
+                error,
+            );
             if (error instanceof PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
                     throw new ConflictException('Message is already pinned');
@@ -747,7 +747,7 @@ export class MessageService {
 
     async unpinMessage(userId: string, chatId: string, messageId: string) {
         const startTime = Date.now();
-        console.log('[UNPIN] Starting unpinMessage');
+        this.logger.debug('[UNPIN] Starting unpinMessage');
 
         const t1 = Date.now();
 
@@ -798,9 +798,11 @@ export class MessageService {
 
             return { messageId, chatId };
         });
-        console.log(`[UNPIN] Transaction (all DB ops): ${Date.now() - t1}ms`);
+        this.logger.debug(
+            `[UNPIN] Transaction (all DB ops): ${Date.now() - t1}ms`,
+        );
 
-        // ✅ Emit socket event + clear cache in parallel (non-blocking)
+        // Emit socket event + clear cache in parallel (non-blocking)
         const t2 = Date.now();
         await Promise.all([
             // socket emit(sync, fast)
@@ -813,15 +815,15 @@ export class MessageService {
             this.redisService.del(`chat:${chatId}:messages`),
             this.redisService.del(`chat:${chatId}:messages:pinned`),
         ]);
-        console.log(`[UNPIN] socket + cache: ${Date.now() - t2}ms`);
+        this.logger.debug(`[UNPIN] socket + cache: ${Date.now() - t2}ms`);
 
         const totalTime = Date.now() - startTime;
-        console.log(`✅ [UNPIN] TOTAL TIME: ${totalTime}ms`);
+        this.logger.log(`[UNPIN] TOTAL TIME: ${totalTime}ms`);
 
         return result;
     }
 
-    // resuable function: to be able for many others functions to call this
+    // resuable function
     async verifyMembership(userId: string, chatId: string) {
         const membership = await this.databaseService.participant.findUnique({
             where: {

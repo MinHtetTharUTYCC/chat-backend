@@ -16,6 +16,7 @@ import {
     forwardRef,
     Inject,
     Injectable,
+    Logger,
     UsePipes,
     ValidationPipe,
 } from '@nestjs/common';
@@ -34,6 +35,7 @@ export class ChatGateway
 {
     @WebSocketServer()
     public server: Server; //public: to use by other services
+    private readonly logger = new Logger(ChatGateway.name);
 
     constructor(
         private readonly jwtService: JwtService,
@@ -64,10 +66,14 @@ export class ChatGateway
     }
 
     async handleConnection(client: Socket) {
-        const userId = client.data.user.sub; // from ws-jwt guard
-        if (!userId) return;
+        const user = (client.data as { user?: { sub?: string } }).user;
+        const userId = user?.sub;
+        if (!userId) {
+            this.logger.warn('Connection attempt without valid user data');
+            return;
+        }
 
-        console.log('✅ Client Connected: ', userId);
+        this.logger.log(`Client Connected: ${userId}`);
 
         //join personal room
         await client.join(`user_${userId}`);
@@ -78,10 +84,13 @@ export class ChatGateway
     }
 
     async handleDisconnect(client: Socket) {
-        const userId = client.data.user.sub; //from ws-jwt guard
-        if (!userId) return;
+        const user = (client.data as { user?: { sub?: string } }).user;
+        const userId = user?.sub;
+        if (!userId) {
+            return;
+        }
 
-        console.log('❌ Client Disconnected: ', client.id);
+        this.logger.log(`Client Disconnected: ${client.id}`);
 
         await this.setUserOffline(userId);
     }
@@ -109,10 +118,13 @@ export class ChatGateway
 
     @SubscribeMessage('user_offline')
     async handleUserOffline(@ConnectedSocket() client: Socket) {
-        const userId = client.data.user.sub;
-        if (!userId) return { status: 'error' };
+        const user = (client.data as { user?: { sub?: string } }).user;
+        const userId = user?.sub;
+        if (!userId) {
+            return { status: 'error' };
+        }
 
-        console.log('Received user_offline', userId);
+        this.logger.debug(`Received user_offline: ${userId}`);
 
         await this.setUserOffline(userId);
 

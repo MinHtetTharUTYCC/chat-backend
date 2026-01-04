@@ -93,7 +93,7 @@ async function generateDmKeysForAllDM() {
     // 2. Pass the adapter to the constructor
     const prisma = new PrismaClient({ adapter });
 
-    console.log('⏳ START seeding dmKeys....');
+    console.log('START seeding dmKeys....');
 
     const chats = await prisma.chat.findMany({
         where: {
@@ -117,7 +117,7 @@ async function generateDmKeysForAllDM() {
             // Validation: DMs must have exactly 2 members
             if (chat.participants.length !== 2) {
                 console.warn(
-                    `⚠️ Chat ${chat.id} has ${chat.participants.length} participants. Skipping.`,
+                    `Chat ${chat.id} has ${chat.participants.length} participants. Skipping.`,
                 );
                 errorCount++;
                 continue;
@@ -140,7 +140,7 @@ async function generateDmKeysForAllDM() {
             process.stdout.write('.');
         }
     } catch (error) {
-        console.error('❌ Seed dmKeys failed:', error);
+        console.error('Seed dmKeys failed:', error);
         throw error;
     } finally {
         await prisma.$disconnect();

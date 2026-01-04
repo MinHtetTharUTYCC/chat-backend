@@ -252,6 +252,7 @@
             "description": "Number of items per page",
             "schema": {
               "minimum": 1,
+              "maximum": 100,
               "default": 20,
               "example": 20,
               "type": "number"
@@ -421,6 +422,7 @@
             "description": "Number of items per page",
             "schema": {
               "minimum": 1,
+              "maximum": 100,
               "default": 20,
               "example": 20,
               "type": "number"
@@ -718,6 +720,7 @@
             "description": "Number of items per page",
             "schema": {
               "minimum": 1,
+              "maximum": 100,
               "default": 20,
               "example": 20,
               "type": "number"
@@ -896,7 +899,7 @@
           "otherUserId": {
             "type": "string",
             "description": "User ID of the person to start a chat with",
-            "example": "user-id-123"
+            "example": "ckx9q8l9o0001z0f9g8h3abcd"
           }
         },
         "required": [
@@ -922,7 +925,7 @@
           "content": {
             "type": "string",
             "description": "New content for the message",
-            "example": "This is the updated message content"
+            "example": "i am edited"
           }
         },
         "required": [
@@ -955,9 +958,9 @@
           "userIds": {
             "description": "Array of user IDs to include in the group chat",
             "example": [
-              "user-id-1",
-              "user-id-2",
-              "user-id-3"
+              "userid1",
+              "userid2",
+              "userid3"
             ],
             "type": "array",
             "items": {
@@ -995,8 +998,8 @@
           "userIds": {
             "description": "Array of user ids to invite to the chat",
             "example": [
-              "user-id-1",
-              "user-id-2"
+              "userid1",
+              "userid2"
             ],
             "type": "array",
             "items": {

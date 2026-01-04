@@ -3,6 +3,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
@@ -16,6 +17,26 @@ import { generateDmKey } from 'src/utils/chat.utils';
 
 @Injectable()
 export class ChatService {
+    private readonly logger = new Logger(ChatService.name);
+
+    // Standard include pattern for chat items in list/response views
+    private readonly chatItemInclude = {
+        messages: {
+            orderBy: { createdAt: 'desc' as const },
+            take: 1,
+        },
+        participants: {
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                    },
+                },
+            },
+        },
+    } as const;
+
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly chatGateway: ChatGateway,
@@ -32,7 +53,7 @@ export class ChatService {
         const cachedResult = cached ? JSON.parse(cached) : null;
 
         if (cachedResult) {
-            console.log('Returning chats from cache..');
+            this.logger.debug('Returning chats from cache..');
             return cachedResult;
         }
 
@@ -60,7 +81,10 @@ export class ChatService {
                     },
                 },
             },
-            orderBy: [{ lastMessageAt: 'desc' }, { updatedAt: 'desc' }],
+            orderBy: [
+                { lastMessageAt: { sort: 'desc' } },
+                { updatedAt: 'desc' },
+            ],
         });
 
         //save to redis(TTL-time_to_live: 5min)
@@ -95,7 +119,7 @@ export class ChatService {
         const cachedResult = cached ? JSON.parse(cached) : null;
 
         if (cachedResult) {
-            console.log('Returning chat from cache..', cachedResult);
+            this.logger.debug('Returning chat from cache..');
             return cachedResult;
         }
 
@@ -180,27 +204,10 @@ export class ChatService {
 
         const dmKey = generateDmKey(me.sub, otherUserId);
 
-        const chatItemInclude = {
-            messages: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-            },
-            participants: {
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            username: true,
-                        },
-                    },
-                },
-            },
-        } as const;
-
         const result = await this.databaseService.$transaction(async (tx) => {
             const existingChat = await tx.chat.findUnique({
                 where: { dmKey },
-                include: chatItemInclude,
+                include: this.chatItemInclude,
             });
 
             if (existingChat) {
@@ -219,7 +226,7 @@ export class ChatService {
                             ],
                         },
                     },
-                    include: chatItemInclude,
+                    include: this.chatItemInclude,
                 });
                 return { chat: newChat, isNew: true };
             } catch (error) {
@@ -229,22 +236,7 @@ export class ChatService {
                     const retryChat =
                         await this.databaseService.chat.findUnique({
                             where: { dmKey: dmKey },
-                            include: {
-                                messages: {
-                                    orderBy: { createdAt: 'desc' },
-                                    take: 1,
-                                },
-                                participants: {
-                                    include: {
-                                        user: {
-                                            select: {
-                                                id: true,
-                                                username: true,
-                                            },
-                                        },
-                                    },
-                                },
-                            },
+                            include: this.chatItemInclude,
                         });
                     return { oldChatExists: true, chat: retryChat };
                 }
@@ -259,7 +251,7 @@ export class ChatService {
         if (result.isNew) {
             this.runNewChatSideEffects(me, otherUserId, result.chat.id).catch(
                 (error) =>
-                    console.error(
+                    this.logger.error(
                         'Background task for starting new chat failed:',
                         error,
                     ),
@@ -306,31 +298,26 @@ export class ChatService {
     }
 
     async getMyFriendsIds(userId: string) {
-        const chats = await this.databaseService.chat.findMany({
+        // OPTIMIZED: Fetch only participant data directly instead of loading entire chats
+        const participants = await this.databaseService.participant.findMany({
             where: {
-                participants: {
-                    some: { userId },
+                // Find all chats user is in
+                chat: {
+                    participants: {
+                        some: { userId },
+                    },
                 },
             },
             select: {
-                participants: {
-                    select: { userId: true },
-                },
+                userId: true,
             },
+            distinct: ['userId'], // Eliminate duplicates at database level
         });
 
-        // extract all participants ID except me
-        const friendIds = new Set<string>();
-
-        for (const chat of chats) {
-            for (const participant of chat.participants) {
-                if (participant.userId !== userId) {
-                    friendIds.add(participant.userId);
-                }
-            }
-        }
-
-        return Array.from(friendIds);
+        // Filter out self and return friend IDs
+        return participants
+            .map((p) => p.userId)
+            .filter((friendId) => friendId !== userId);
     }
 
     async getMyChatsIds(userId: string) {
@@ -443,8 +430,8 @@ export class ChatService {
 
                 await Promise.all(promises);
             } catch (error) {
-                console.error(
-                    `Background task failed for updating chat tile ${chatId}:`,
+                this.logger.error(
+                    `Background task failed for updating chat title ${chatId}:`,
                     error,
                 );
             }
@@ -537,8 +524,8 @@ export class ChatService {
 
                 await Promise.all(promises);
             } catch (error) {
-                console.error(
-                    'Failed to run backgroun tasks for new group creation',
+                this.logger.error(
+                    'Failed to run background tasks for new group creation',
                     error,
                 );
             }
@@ -694,7 +681,7 @@ export class ChatService {
 
                 await Promise.all(promises);
             } catch (error) {
-                console.error(
+                this.logger.error(
                     `Background task failed for adding members to chat: ${chatId}:`,
                     error,
                 );
@@ -811,7 +798,7 @@ export class ChatService {
                     ),
                 );
             } catch (error) {
-                console.error(
+                this.logger.error(
                     `Background task failed for inviting members to chat: ${chatId}:`,
                     error,
                 );

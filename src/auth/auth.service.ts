@@ -2,6 +2,7 @@ import {
     BadRequestException,
     ForbiddenException,
     Injectable,
+    Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
@@ -16,6 +17,7 @@ export type JwtPayload = {
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
     constructor(
         private jwt: JwtService,
         private readonly usersService: UsersService,
@@ -47,6 +49,7 @@ export class AuthService {
     }
 
     async login(loginDto: LoginDto) {
+        this.logger.log(`User Logged in: ${loginDto.email}`);
         //validate user
         const user = await this.usersService.validateUser(loginDto);
 
@@ -65,6 +68,7 @@ export class AuthService {
     }
 
     async register(registerDto: RegisterDto) {
+        this.logger.log(`User registered: ${registerDto.email}`);
         // check existing
         const userExists = await this.usersService.userExistsByMail(
             registerDto.email,
@@ -97,6 +101,7 @@ export class AuthService {
     }
 
     async refreshTokens(userId: string, oldRefreshToken: string) {
+        this.logger.log(`User Refreshed tokens: ${userId}`);
         const user = await this.usersService.getRefreshTokenOfUser(userId);
         if (!user || !user.refreshToken) {
             throw new ForbiddenException('Access Denied');
@@ -117,6 +122,7 @@ export class AuthService {
     }
 
     async logout(userId: string) {
+        this.logger.log(`User Logged out: ${userId}`);
         await this.usersService.deleteRefreshToken(userId);
     }
 }

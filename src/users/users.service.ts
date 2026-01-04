@@ -71,7 +71,6 @@ export class UsersService {
     }
     // for saving new refresh token
     async updateRefreshToken(userId: string, hashedRT: string) {
-        console.log('UPDATE Rtoken at DB: ', hashedRT);
         await this.databaseService.user.update({
             where: { id: userId },
             data: {

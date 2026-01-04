@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Logger,
     Param,
     Patch,
     Post,
@@ -28,6 +29,8 @@ import { InviteToChatDto } from './dto/invite-to-chat.dto';
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
+    private readonly logger = new Logger(ChatController.name);
+
     constructor(
         private readonly chatService: ChatService,
         private readonly messageService: MessageService,
@@ -86,7 +89,7 @@ export class ChatController {
 
     @Get('/:chatId')
     async viewChat(@Req() req, @Param('chatId') chatId: string) {
-        console.log('Viewing chat:', chatId, 'for user:', req.user.sub);
+        this.logger.debug(`Viewing chat: ${chatId} for user: ${req.user.sub}`);
         return this.chatService.viewChat(req.user.sub, chatId);
     }
 
@@ -118,7 +121,6 @@ export class ChatController {
         );
     }
 
-    // PINNED MESSAGES
     // get pinned messages
     @Get('/:chatId/pinned')
     async getPinnedMessages(
