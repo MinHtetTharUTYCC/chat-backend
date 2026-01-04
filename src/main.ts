@@ -31,7 +31,7 @@ async function bootstrap() {
 
     const config = new DocumentBuilder()
         .setTitle('Chat Backend API')
-        .setDescription('API for chat application backend')
+        .setDescription('API for chat application')
         .setVersion('1.0')
         .addCookieAuth('jwt')
         .build();

@@ -823,7 +823,7 @@ export class MessageService {
         return result;
     }
 
-    // resuable function
+    // reusable function
     async verifyMembership(userId: string, chatId: string) {
         const membership = await this.databaseService.participant.findUnique({
             where: {

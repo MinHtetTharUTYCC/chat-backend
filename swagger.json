@@ -17,23 +17,59 @@
     },
     "/auth/login": {
       "post": {
+        "description": "Authenticate user with email and password. Returns access token and sets refresh token in HTTP-only cookie.",
         "operationId": "AuthController_login",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "User credentials",
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginDto"
+              },
+              "examples": {
+                "example1": {
+                  "summary": "Standard login",
+                  "value": {
+                    "email": "user@example.com",
+                    "password": "Password123!"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Login successful. Access token returned, refresh token set in cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                },
+                "example": {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "user": {
+                    "id": "user123",
+                    "username": "john_doe",
+                    "email": "john@example.com"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid credentials"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid email or password"
+          },
+          "429": {
+            "description": "Too many requests - Rate limit exceeded"
           }
         },
+        "summary": "User login",
         "tags": [
           "Auth"
         ]
@@ -41,23 +77,57 @@
     },
     "/auth/register": {
       "post": {
+        "description": "Register a new user account. Returns access token and sets refresh token in HTTP-only cookie.",
         "operationId": "AuthController_register",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "User registration data",
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RegisterDto"
+              },
+              "examples": {
+                "example1": {
+                  "summary": "New user registration",
+                  "value": {
+                    "email": "newuser@example.com",
+                    "username": "new_user",
+                    "password": "Password123!"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Registration successful. Access token returned, refresh token set in cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponseDto"
+                },
+                "example": {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "user": {
+                    "id": "user456",
+                    "username": "new_user",
+                    "email": "newuser@example.com"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Email already taken or invalid data"
+          },
+          "429": {
+            "description": "Too many requests - Rate limit exceeded"
           }
         },
+        "summary": "User registration",
         "tags": [
           "Auth"
         ]
@@ -65,13 +135,39 @@
     },
     "/auth/refresh": {
       "post": {
+        "description": "Get a new access token using the refresh token from HTTP-only cookie. Requires valid refresh token in cookie.",
         "operationId": "AuthController_refresh",
         "parameters": [],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Access token refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponseDto"
+                },
+                "example": {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or expired refresh token"
+          },
+          "403": {
+            "description": "Forbidden - Access denied"
+          },
+          "429": {
+            "description": "Too many requests - Rate limit exceeded"
           }
         },
+        "security": [
+          {
+            "refresh_token": []
+          }
+        ],
+        "summary": "Refresh access token",
         "tags": [
           "Auth"
         ]
@@ -79,13 +175,37 @@
     },
     "/auth/logout": {
       "post": {
+        "description": "Log out user by clearing refresh token from database and cookie. Requires valid access token.",
         "operationId": "AuthController_logout",
         "parameters": [],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponseDto"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Logged out successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid access token"
+          },
+          "429": {
+            "description": "Too many requests - Rate limit exceeded"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "User logout",
         "tags": [
           "Auth"
         ]
@@ -93,51 +213,154 @@
     },
     "/users/me": {
       "get": {
+        "description": "Returns the profile information of the authenticated user",
         "operationId": "UsersController_getMe",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "User profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                },
+                "example": {
+                  "id": "user123",
+                  "username": "john_doe",
+                  "email": "john@example.com"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user profile",
         "tags": [
-          "Users"
+          "users"
         ]
       },
       "patch": {
+        "description": "Update the profile information of the authenticated user",
         "operationId": "UsersController_updateUser",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "User update data",
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateUserDto"
+              },
+              "examples": {
+                "example1": {
+                  "summary": "Update username",
+                  "value": {
+                    "username": "new_username"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "User profile updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateUserResponseDto"
+                },
+                "example": {
+                  "success": true,
+                  "username": "new_username"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid data provided"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user profile",
         "tags": [
-          "Users"
+          "users"
         ]
       }
     },
     "/users/search": {
       "get": {
+        "description": "Search for users by username (excluding current user)",
         "operationId": "UsersController_searchUsers",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query string",
+            "schema": {
+              "minLength": 1,
+              "example": "john",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Search results retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchUserResponseDto"
+                  }
+                },
+                "example": [
+                  {
+                    "id": "user456",
+                    "username": "john_smith"
+                  },
+                  {
+                    "id": "user789",
+                    "username": "john_doe"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search users",
         "tags": [
-          "Users"
+          "users"
         ]
       }
     },
@@ -147,11 +370,30 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "List of all chats the user participates in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatListItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all chats for the current user",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -161,11 +403,30 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Array of chat IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get IDs of all chats the user participates in",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -185,11 +446,33 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Chat started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartChatResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - cannot chat with yourself"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a direct message chat with another user",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -201,6 +484,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -209,7 +493,7 @@
             "name": "prevCursor",
             "required": false,
             "in": "query",
-            "description": "Cursor for previous messages (optional)",
+            "description": "Cursor for loading newer messages",
             "schema": {
               "example": "msg-id",
               "type": "string"
@@ -219,7 +503,7 @@
             "name": "nextCursor",
             "required": false,
             "in": "query",
-            "description": "Cursor for next messages (optional)",
+            "description": "Cursor for loading older messages",
             "schema": {
               "example": "msg-id",
               "type": "string"
@@ -229,7 +513,7 @@
             "name": "aroundMessageId",
             "required": false,
             "in": "query",
-            "description": "Message id for look up (optional)",
+            "description": "Message ID to load messages around (for pinned or search)",
             "schema": {
               "example": "msg-id",
               "type": "string"
@@ -239,7 +523,7 @@
             "name": "aroundDate",
             "required": false,
             "in": "query",
-            "description": "Timestamp for look up (optional)",
+            "description": "Timestamp to load messages around",
             "schema": {
               "example": "12345678",
               "type": "number"
@@ -249,7 +533,7 @@
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Number of items per page",
+            "description": "Number of messages to load (default: 20)",
             "schema": {
               "minimum": 1,
               "maximum": 100,
@@ -261,11 +545,33 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Messages retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMessagesResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat or message not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get messages for a specific chat with pagination support",
         "tags": [
-          "Chat"
+          "chats"
         ]
       },
       "post": {
@@ -275,6 +581,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -292,11 +599,33 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Message sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a message to a chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -308,6 +637,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -315,11 +645,40 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Chat retrieved successfully. Returns FullChatDto if user is participant, PreviewChatDto otherwise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/FullChatDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PreviewChatDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - cannot view private chats of others"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "View a specific chat (full or preview)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -331,6 +690,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -339,6 +699,7 @@
             "name": "messageId",
             "required": true,
             "in": "path",
+            "description": "The ID of the message to delete",
             "schema": {
               "type": "string"
             }
@@ -346,11 +707,33 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Message deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteMessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or not the sender"
+          },
+          "404": {
+            "description": "Chat or message not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a message (only sender can delete)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       },
       "patch": {
@@ -360,6 +743,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -368,6 +752,7 @@
             "name": "messageId",
             "required": true,
             "in": "path",
+            "description": "The ID of the message to edit",
             "schema": {
               "type": "string"
             }
@@ -385,11 +770,33 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Message edited successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditMessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or not the sender"
+          },
+          "404": {
+            "description": "Chat or message not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a message (only sender can edit)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -401,6 +808,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -409,7 +817,7 @@
             "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Cursor for pagination (optional)",
+            "description": "Cursor for pagination",
             "schema": {
               "example": "cursor-string",
               "type": "string"
@@ -419,7 +827,7 @@
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Number of items per page",
+            "description": "Number of pinned messages to load (default: 20)",
             "schema": {
               "minimum": 1,
               "maximum": 100,
@@ -431,11 +839,33 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Pinned messages retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPinnedMessagesResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get pinned messages in a chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -447,6 +877,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -455,6 +886,7 @@
             "name": "messageId",
             "required": true,
             "in": "path",
+            "description": "The ID of the message to pin",
             "schema": {
               "type": "string"
             }
@@ -462,11 +894,36 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "Message pinned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinMessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat or message not found"
+          },
+          "409": {
+            "description": "Message is already pinned"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pin a message in a chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       },
       "delete": {
@@ -476,6 +933,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -484,6 +942,7 @@
             "name": "messageId",
             "required": true,
             "in": "path",
+            "description": "The ID of the message to unpin",
             "schema": {
               "type": "string"
             }
@@ -491,11 +950,33 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Message unpinned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpinMessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or not the pin creator/message owner"
+          },
+          "404": {
+            "description": "Chat, message, or pin not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unpin a message (pin creator or message owner can unpin)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -507,6 +988,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -524,11 +1006,33 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Chat title updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateChatTitleResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or direct message"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update chat title (group chats only)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -548,11 +1052,30 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Group chat created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateGroupChatResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - group must have at least one other member"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new group chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -564,6 +1087,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -581,11 +1105,36 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Members added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddToGroupChatResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - no valid users to add"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or direct message"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add members to a group chat (they automatically join)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -597,6 +1146,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -614,11 +1164,36 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Invitation sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteToGroupResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - no valid users to invite"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat or direct message"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite members to a group chat (they must accept invitation)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -630,14 +1205,16 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "q",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Search query for username or email",
             "schema": {
               "type": "string"
             }
@@ -645,11 +1222,33 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Available users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchUsersToInviteResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat not found or not a group"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search for users that can be invited to a group chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -661,6 +1260,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -668,11 +1268,33 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "Successfully joined the group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinGroupResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Chat not found"
+          },
+          "409": {
+            "description": "Conflict - already a member of this chat or not a group"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Join a group chat (for accepting invitations)",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
@@ -684,6 +1306,7 @@
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "The ID of the chat",
             "schema": {
               "type": "string"
             }
@@ -691,25 +1314,48 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully left the group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaveGroupResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not a member of this chat"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Leave a group chat",
         "tags": [
-          "Chat"
+          "chats"
         ]
       }
     },
     "/notifications": {
       "get": {
+        "description": "Retrieve paginated notifications for the authenticated user with cursor-based pagination",
         "operationId": "NotificationController_getNotifications",
         "parameters": [
           {
             "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Cursor for pagination (optional)",
+            "description": "Cursor for pagination (notification ID to start from)",
             "schema": {
-              "example": "cursor-string",
+              "example": "notif123",
               "type": "string"
             }
           },
@@ -717,7 +1363,7 @@
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Number of items per page",
+            "description": "Number of notifications to retrieve (max 50)",
             "schema": {
               "minimum": 1,
               "maximum": 100,
@@ -729,106 +1375,366 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Paginated notifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedNotificationsResponseDto"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "notif123",
+                      "chatId": "chat123",
+                      "actorId": "user456",
+                      "receiverId": "user123",
+                      "type": "MESSAGE",
+                      "data": {
+                        "messageId": "msg789"
+                      },
+                      "createdAt": "2023-01-01T12:00:00.000Z",
+                      "chat": {
+                        "id": "chat123",
+                        "title": "Team Chat"
+                      },
+                      "actor": {
+                        "id": "user456",
+                        "username": "john_doe"
+                      }
+                    }
+                  ],
+                  "meta": {
+                    "nextCursor": "notif124",
+                    "hasMore": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid pagination parameters"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user notifications",
         "tags": [
-          "Notification"
+          "notifications"
         ]
       }
     },
     "/presence/friends": {
       "get": {
+        "description": "Returns a list of online friends for the authenticated user",
         "operationId": "PresenceController_getOnlineFriends",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "List of online friend IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get online friends",
         "tags": [
-          "Presence"
+          "presence"
         ]
       }
     },
     "/presence/bulk": {
       "post": {
+        "description": "Get presence status for multiple users at once",
         "operationId": "PresenceController_getBulkPresence",
         "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
+        "requestBody": {
+          "required": true,
+          "description": "Array of user IDs to check presence for",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPresenceDto"
+              },
+              "examples": {
+                "example1": {
+                  "summary": "Check multiple users",
+                  "value": {
+                    "userIds": [
+                      "user1",
+                      "user2",
+                      "user3"
+                    ]
+                  }
+                }
+              }
+            }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Presence status for all requested users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPresenceResponseDto"
+                },
+                "example": {
+                  "user1": {
+                    "online": true,
+                    "lastSeen": null
+                  },
+                  "user2": {
+                    "online": false,
+                    "lastSeen": "1672531200000"
+                  },
+                  "user3": {
+                    "online": true,
+                    "lastSeen": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid user IDs"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get bulk presence status",
         "tags": [
-          "Presence"
+          "presence"
         ]
       }
     },
     "/presence/{userId}": {
       "get": {
+        "description": "Get presence status for a specific user",
         "operationId": "PresenceController_getPresence",
         "parameters": [
           {
             "name": "userId",
             "required": true,
             "in": "path",
+            "description": "User ID to check presence for",
             "schema": {
+              "example": "user123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "User presence status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceResponseDto"
+                },
+                "example": {
+                  "userId": "user123",
+                  "online": true,
+                  "lastSeen": null
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user presence",
         "tags": [
-          "Presence"
+          "presence"
         ]
       }
     },
     "/search": {
       "get": {
+        "description": "Search for users (by username/email) and groups (by title) that the authenticated user has access to",
         "operationId": "SearchController_searchChats",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query string",
+            "schema": {
+              "minLength": 1,
+              "example": "john",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Search results for users and groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchChatsResponseDto"
+                },
+                "example": {
+                  "users": [
+                    {
+                      "id": "user123",
+                      "username": "john_doe"
+                    },
+                    {
+                      "id": "user456",
+                      "username": "john_smith"
+                    }
+                  ],
+                  "groups": [
+                    {
+                      "id": "chat123",
+                      "title": "John's Team"
+                    },
+                    {
+                      "id": "chat456",
+                      "title": "Project John"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid search query"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search users and groups",
         "tags": [
-          "Search"
+          "search"
         ]
       }
     },
     "/search/chats/{chatId}": {
       "get": {
+        "description": "Search for messages containing specific text within a chat that the user is a member of",
         "operationId": "SearchController_searchInMessages",
         "parameters": [
           {
             "name": "chatId",
             "required": true,
             "in": "path",
+            "description": "Chat ID to search within",
             "schema": {
+              "example": "chat123",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query string",
+            "schema": {
+              "minLength": 1,
+              "example": "hello world",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Messages containing the search query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageSearchResultDto"
+                  }
+                },
+                "example": [
+                  {
+                    "id": "msg123",
+                    "content": "Hello world! How are you?",
+                    "createdAt": "2023-01-01T12:00:00.000Z",
+                    "sender": {
+                      "id": "user123",
+                      "username": "john_doe"
+                    }
+                  },
+                  {
+                    "id": "msg456",
+                    "content": "World news today...",
+                    "createdAt": "2023-01-01T11:30:00.000Z",
+                    "sender": {
+                      "id": "user456",
+                      "username": "jane_smith"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token"
+          },
+          "403": {
+            "description": "Forbidden - User is not a member of the chat"
+          },
+          "404": {
+            "description": "Chat not found"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search messages in a specific chat",
         "tags": [
-          "Search"
+          "search"
         ]
       }
     }
   },
   "info": {
     "title": "Chat Backend API",
-    "description": "API for chat application backend",
+    "description": "API for chat application",
     "version": "1.0",
     "contact": {}
   },
@@ -848,12 +1754,13 @@
         "properties": {
           "email": {
             "type": "string",
-            "description": "The email address of the user",
-            "example": "john.doe@example.com"
+            "description": "User email address",
+            "example": "john.doe@example.com",
+            "format": "email"
           },
           "password": {
             "type": "string",
-            "description": "The password (minimum 6 characters)",
+            "description": "User Password",
             "example": "strongpassword123",
             "minLength": 6
           }
@@ -863,22 +1770,72 @@
           "password"
         ]
       },
+      "UserInfoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID",
+            "example": "user123"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "john_doe"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address",
+            "example": "john@example.com"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token for API authorization",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "description": "User information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserInfoDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "user"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "Uername of the user",
-            "example": "user111"
+            "description": "Username (3-50 characters)",
+            "example": "user111",
+            "minLength": 3,
+            "maxLength": 50
           },
           "email": {
             "type": "string",
-            "description": "The email address of the user",
-            "example": "john.doe@example.com"
+            "description": "User email address",
+            "example": "john.doe@example.com",
+            "format": "email"
           },
           "password": {
             "type": "string",
-            "description": "The password (minimum 6 characters)",
+            "description": "User Password",
             "example": "strongpassword123",
             "minLength": 6
           }
@@ -889,9 +1846,178 @@
           "password"
         ]
       },
+      "RegisterResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token for API authorization",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "description": "User information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserInfoDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "user"
+        ]
+      },
+      "RefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "New JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "LogoutResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Logout operation success status",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Logout message",
+            "example": "Logged out successfully"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID",
+            "example": "user123"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "john_doe"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address",
+            "example": "john@example.com"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email"
+        ]
+      },
       "UpdateUserDto": {
         "type": "object",
         "properties": {}
+      },
+      "UpdateUserResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Update operation success status",
+            "example": true
+          },
+          "username": {
+            "type": "string",
+            "description": "Updated username",
+            "example": "new_username"
+          }
+        },
+        "required": [
+          "success",
+          "username"
+        ]
+      },
+      "SearchUserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID",
+            "example": "user456"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "jane_smith"
+          }
+        },
+        "required": [
+          "id",
+          "username"
+        ]
+      },
+      "ChatListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Chat title"
+          },
+          "isGroup": {
+            "type": "boolean",
+            "description": "Whether this is a group chat"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Chat creation date"
+          },
+          "lastMessageAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last message update time"
+          },
+          "messages": {
+            "description": "Latest message in the chat",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "participants": {
+            "description": "Chat participants",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update date"
+          }
+        },
+        "required": [
+          "id",
+          "isGroup",
+          "createdAt",
+          "participants"
+        ]
       },
       "StartChatDto": {
         "type": "object",
@@ -904,6 +2030,121 @@
         },
         "required": [
           "otherUserId"
+        ]
+      },
+      "StartChatResponseDto": {
+        "type": "object",
+        "properties": {
+          "oldChatExists": {
+            "type": "boolean",
+            "description": "Whether old chat exists"
+          },
+          "chat": {
+            "$ref": "#/components/schemas/ChatListItemDto"
+          }
+        },
+        "required": [
+          "oldChatExists",
+          "chat"
+        ]
+      },
+      "MessageWithPinDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "senderId": {
+            "type": "string",
+            "description": "Sender ID"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Message creation date"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Message update date"
+          },
+          "sender": {
+            "type": "object"
+          },
+          "isPinned": {
+            "type": "boolean",
+            "description": "Whether message is pinned"
+          },
+          "pinnedByUserId": {
+            "type": "object",
+            "description": "ID of user who pinned this message"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "chatId",
+          "senderId",
+          "createdAt",
+          "updatedAt",
+          "sender",
+          "isPinned"
+        ]
+      },
+      "MessageMetaDto": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "object",
+            "description": "Cursor for loading older messages"
+          },
+          "prevCursor": {
+            "type": "object",
+            "description": "Cursor for loading newer messages"
+          },
+          "hasMoreNext": {
+            "type": "boolean",
+            "description": "Whether there are more newer messages"
+          },
+          "hasMorePrev": {
+            "type": "boolean",
+            "description": "Whether there are more older messages"
+          },
+          "anchorMessageId": {
+            "type": "string",
+            "description": "Anchor message ID if jumping to specific message"
+          }
+        },
+        "required": [
+          "hasMoreNext",
+          "hasMorePrev"
+        ]
+      },
+      "GetMessagesResponseDto": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageWithPinDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MessageMetaDto"
+          }
+        },
+        "required": [
+          "messages",
+          "meta"
         ]
       },
       "SendMessageDto": {
@@ -919,6 +2160,66 @@
           "content"
         ]
       },
+      "SendMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "senderId": {
+            "type": "string",
+            "description": "Sender ID"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Message creation date"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Message update date"
+          },
+          "sender": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "chatId",
+          "senderId",
+          "createdAt",
+          "updatedAt",
+          "sender"
+        ]
+      },
+      "DeleteMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId"
+        ]
+      },
       "EditMessageDto": {
         "type": "object",
         "properties": {
@@ -930,6 +2231,143 @@
         },
         "required": [
           "content"
+        ]
+      },
+      "EditMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "Updated message content"
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId",
+          "content"
+        ]
+      },
+      "PinnedMessageDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "senderId": {
+            "type": "string",
+            "description": "Message sender ID"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "senderId"
+        ]
+      },
+      "PinnedMessageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Pinned message record ID"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "messageId": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "pinnedByUserId": {
+            "type": "string",
+            "description": "User who pinned this message"
+          },
+          "user": {
+            "type": "object"
+          },
+          "message": {
+            "$ref": "#/components/schemas/PinnedMessageDetailDto"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Pin creation date"
+          }
+        },
+        "required": [
+          "id",
+          "chatId",
+          "messageId",
+          "pinnedByUserId",
+          "user",
+          "message",
+          "createdAt"
+        ]
+      },
+      "GetPinnedMessagesResponseDto": {
+        "type": "object",
+        "properties": {
+          "pinnedMessages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PinnedMessageDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MessageMetaDto"
+          }
+        },
+        "required": [
+          "pinnedMessages",
+          "meta"
+        ]
+      },
+      "PinMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId"
+        ]
+      },
+      "UnpinMessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "Message ID"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId"
         ]
       },
       "UpdateChatTitleDto": {
@@ -944,6 +2382,22 @@
         },
         "required": [
           "title"
+        ]
+      },
+      "UpdateChatTitleResponseDto": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "New chat title"
+          }
+        },
+        "required": [
+          "chatId"
         ]
       },
       "CreateGroupChatDto": {
@@ -973,6 +2427,85 @@
           "userIds"
         ]
       },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username"
+          }
+        },
+        "required": [
+          "id",
+          "username"
+        ]
+      },
+      "ParticipantDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "description": "User information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "CreateGroupChatResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Group title"
+          },
+          "isGroup": {
+            "type": "boolean",
+            "description": "Whether this is a group chat"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Chat creation date"
+          },
+          "lastMessageAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last message update time"
+          },
+          "messages": {
+            "description": "Latest messages",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipantDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "isGroup",
+          "createdAt",
+          "participants"
+        ]
+      },
       "AddToChatDto": {
         "type": "object",
         "properties": {
@@ -992,6 +2525,28 @@
           "userIds"
         ]
       },
+      "AddToGroupChatResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "addedMembersCount": {
+            "type": "number",
+            "description": "Number of members added"
+          }
+        },
+        "required": [
+          "success",
+          "chatId",
+          "addedMembersCount"
+        ]
+      },
       "InviteToChatDto": {
         "type": "object",
         "properties": {
@@ -1009,6 +2564,305 @@
         },
         "required": [
           "userIds"
+        ]
+      },
+      "InviteToGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          },
+          "invitedMembersCount": {
+            "type": "number",
+            "description": "Number of members invited"
+          }
+        },
+        "required": [
+          "success",
+          "chatId",
+          "invitedMembersCount"
+        ]
+      },
+      "SearchUsersToInviteResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "JoinGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          }
+        },
+        "required": [
+          "success",
+          "chatId"
+        ]
+      },
+      "LeaveGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID"
+          }
+        },
+        "required": [
+          "success",
+          "chatId"
+        ]
+      },
+      "ChatInfoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Chat ID",
+            "example": "chat123"
+          },
+          "title": {
+            "type": "string",
+            "description": "Chat title",
+            "example": "Team Chat"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Notification ID",
+            "example": "notif123"
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat ID where the notification originated",
+            "example": "chat123"
+          },
+          "actorId": {
+            "type": "string",
+            "description": "ID of user who triggered the notification",
+            "example": "user456"
+          },
+          "receiverId": {
+            "type": "string",
+            "description": "ID of user receiving the notification",
+            "example": "user123"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of notification",
+            "enum": [
+              "NEW_CHAT",
+              "GROUP_ADDED",
+              "GROUP_INVITED",
+              "MESSAGE_PINNED",
+              "TITLE_UPDATED"
+            ],
+            "example": "NEW_CHAT"
+          },
+          "data": {
+            "type": "object",
+            "description": "Additional notification data",
+            "example": {
+              "messageId": "msg789"
+            },
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the notification was created",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "chat": {
+            "description": "Chat information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatInfoDto"
+              }
+            ]
+          },
+          "actor": {
+            "description": "Actor (user who triggered) information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserInfoDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "chatId",
+          "actorId",
+          "receiverId",
+          "type",
+          "data",
+          "createdAt",
+          "chat",
+          "actor"
+        ]
+      },
+      "PaginatedNotificationsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "List of notifications",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "description": "Pagination metadata",
+            "example": {
+              "nextCursor": "notif124",
+              "hasMore": true
+            }
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "BulkPresenceDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "BulkPresenceResponseDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "PresenceResponseDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UserSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User ID",
+            "example": "user123"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "john_doe"
+          }
+        },
+        "required": [
+          "id",
+          "username"
+        ]
+      },
+      "GroupSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Chat/Group ID",
+            "example": "chat123"
+          },
+          "title": {
+            "type": "object",
+            "description": "Group title/name",
+            "example": "Team Alpha"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "SearchChatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "description": "List of users matching search",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSearchResultDto"
+            }
+          },
+          "groups": {
+            "description": "List of groups matching search",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupSearchResultDto"
+            }
+          }
+        },
+        "required": [
+          "users",
+          "groups"
+        ]
+      },
+      "MessageSearchResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID",
+            "example": "msg123"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content",
+            "example": "Hello everyone!"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Message creation timestamp",
+            "example": "2023-01-01T12:00:00.000Z"
+          },
+          "sender": {
+            "description": "Message sender information",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSearchResultDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "createdAt",
+          "sender"
         ]
       }
     }

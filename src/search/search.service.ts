@@ -1,11 +1,18 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import {
+    MessageSearchResultDto,
+    SearchChatsResponseDto,
+} from './dto/search.response.dto';
 
 @Injectable()
 export class SearchService {
     constructor(private readonly databaseService: DatabaseService) {}
 
-    async searchChats(userId: string, query: string) {
+    async searchChats(
+        userId: string,
+        query: string,
+    ): Promise<SearchChatsResponseDto> {
         const [users, groups] = await Promise.all([
             //users
             this.databaseService.user.findMany({
@@ -45,7 +52,11 @@ export class SearchService {
         return { users, groups };
     }
 
-    async searchMessageInChat(userId: string, chatId: string, query: string) {
+    async searchMessageInChat(
+        userId: string,
+        chatId: string,
+        query: string,
+    ): Promise<MessageSearchResultDto[]> {
         // verify member
         const membership = await this.databaseService.participant.findUnique({
             where: {

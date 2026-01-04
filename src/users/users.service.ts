@@ -8,6 +8,11 @@ import { RegisterDto } from 'src/auth/dto/register.dto';
 import { DatabaseService } from 'src/database/database.service';
 import bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto';
+import {
+    SearchUserResponseDto,
+    UpdateUserResponseDto,
+    UserResponseDto,
+} from './dto/response.user.dto';
 
 @Injectable()
 export class UsersService {
@@ -91,7 +96,7 @@ export class UsersService {
 
     // get user info
     async getMe(userId: string) {
-        const user = this.databaseService.user.findUnique({
+        const user = await this.databaseService.user.findUnique({
             where: {
                 id: userId,
             },
@@ -106,7 +111,10 @@ export class UsersService {
         return user;
     }
 
-    async updateUser(userId: string, dto: UpdateUserDto) {
+    async updateUser(
+        userId: string,
+        dto: UpdateUserDto,
+    ): Promise<UpdateUserResponseDto> {
         const user = await this.databaseService.user.update({
             where: { id: userId },
             data: {
@@ -124,8 +132,11 @@ export class UsersService {
         };
     }
 
-    async searchUsers(userId: string, query: string) {
-        return this.databaseService.user.findMany({
+    async searchUsers(
+        userId: string,
+        query: string,
+    ): Promise<SearchUserResponseDto[]> {
+        const users = await this.databaseService.user.findMany({
             where: {
                 id: {
                     not: userId,
@@ -140,5 +151,6 @@ export class UsersService {
                 createdAt: 'desc',
             },
         });
+        return users;
     }
 }

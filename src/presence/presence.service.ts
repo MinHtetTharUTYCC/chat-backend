@@ -3,13 +3,10 @@ import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class PresenceService {
-    private readonly logger = new Logger(PresenceService.name);
-
-    // private onlineUsers = new Set<string>();
     constructor(private readonly redisService: RedisService) {}
 
     async setOnline(userId: string) {
-        // ✅ SET ONLINE in Redis
+        // SET ONLINE in Redis
         await this.redisService.client.set(`presence:${userId}`, 'online');
         await this.redisService.client.del(`lastseen:${userId}`);
         await this.redisService.client.expire(`presence:${userId}`, 300); // 5 min TTL
@@ -44,18 +41,6 @@ export class PresenceService {
             lastSeen: lastSeen || null,
         };
     }
-
-    // Maybe later: Save "last seen"
-    // async setLastSeen(userId: string) {
-    //     await this.redis.client.set(
-    //         `lastSeen:${userId}`,
-    //         Date.now().toString(),
-    //     );
-    // }
-    // Maybe later: Get 'last seen'
-    // async getLastSeen(userId: string) {
-    //     return await this.redis.client.get(`lastSeen:${userId}`);
-    // }
 
     async getOnlineUsers(friendIds: string[]): Promise<string[]> {
         if (!friendIds.length) return [];

@@ -90,7 +90,7 @@ export class ChatGateway
             return;
         }
 
-        this.logger.log(`Client Disconnected: ${client.id}`);
+        this.logger.log(`Client Disconnected: ${userId}`);
 
         await this.setUserOffline(userId);
     }
