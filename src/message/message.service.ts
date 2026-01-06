@@ -7,8 +7,18 @@ import {
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
-import { RequestUser } from 'src/auth/interfaces/request-user.interface';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 import { ChatGateway } from 'src/chat/chat.gateway';
+import { MessageDto } from 'src/chat/dto/chat-response.dto';
+import {
+    DeleteMessageResponseDto,
+    EditMessageResponseDto,
+    GetMessagesResponseDto,
+    GetPinnedMessagesResponseDto,
+    PinMessageResponseDto,
+    SendMessageResponseDto,
+    UnpinMessageResponseDto,
+} from 'src/chat/dto/message-response.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { RedisService } from 'src/redis/redis.service';
@@ -26,7 +36,11 @@ export class MessageService {
         private redisService: RedisService,
     ) {}
 
-    async sendMessage(userId: string, chatId: string, content: string) {
+    async sendMessage(
+        userId: string,
+        chatId: string,
+        content: string,
+    ): Promise<SendMessageResponseDto> {
         const result = await this.databaseService.$transaction(async (tx) => {
             const [membership, participantIds] = await Promise.all([
                 tx.participant.findUnique({
@@ -49,7 +63,7 @@ export class MessageService {
                 );
             }
 
-            const [newMessage, _] = await Promise.all([
+            const [newMessage] = await Promise.all([
                 tx.message.create({
                     data: {
                         content,
@@ -112,7 +126,7 @@ export class MessageService {
             aroundDate?: number;
         },
         limit: number = 20,
-    ) {
+    ): Promise<GetMessagesResponseDto> {
         await this.verifyMembership(userId, chatId);
 
         const latestMessageKey = `chat:${chatId}:messages`;
@@ -128,18 +142,23 @@ export class MessageService {
         if (!activeCursor && !jumpingToMessage && !jumpingToDate) {
             const cacheded = await this.redisService.get(latestMessageKey);
             if (cacheded) {
-                const parsed = JSON.parse(cacheded);
-                if (this.cacheValidator.validateMessagesCache(parsed)) {
-                    this.logger.debug('Returning messages from cache...');
-                    return parsed;
-                } else {
-                    this.logger.warn('Failed to get messages from cache!');
+                try {
+                    const parsed: unknown = JSON.parse(cacheded);
+                    if (this.cacheValidator.validateMessagesCache(parsed)) {
+                        this.logger.debug('Returning messages from cache...');
+                        return parsed;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        'Failed to parse cache JSON. Falling back to DB...',
+                        error,
+                    );
                 }
             }
         }
 
-        let messages: any[];
-        let anchorMessage: any = null;
+        let messages: MessageDto[];
+        let anchorMessage: MessageDto | null = null;
 
         if (jumpingToMessage) {
             anchorMessage = await this.databaseService.message.findUnique({
@@ -252,7 +271,7 @@ export class MessageService {
 
         let nextCursor: string | null = null; // for OLDER items
         let prevCursor: string | null = null; // for NEWER items
-        let messagesSorted: any[] = [];
+        let messagesSorted: MessageDto[] = [];
 
         if (messages.length > 0) {
             // find oldest and newest
@@ -304,7 +323,8 @@ export class MessageService {
         const pinnedMap = new Map(
             pinned.map((p) => [p.messageId, p.pinnedByUserId]),
         );
-        messagesSorted = messagesSorted.map((msg) => {
+
+        const messagesWithPinned = messagesSorted.map((msg) => {
             const pinInfo = pinnedMap.get(msg.id);
 
             return {
@@ -315,13 +335,10 @@ export class MessageService {
         });
 
         const response = {
-            messages: messagesSorted,
+            messages: messagesWithPinned,
             meta: {
                 nextCursor, //to load newers(upward)
                 prevCursor, //to load olders(downward)
-                hasMoreNext: nextCursor !== null,
-                hasMorePrev: prevCursor !== null,
-                anchorMessageId: searchParams.aroundMessageId, //for frontend
             },
         };
 
@@ -338,7 +355,11 @@ export class MessageService {
         return response;
     }
 
-    async deleteMessage(userId: string, chatId: string, messageId: string) {
+    async deleteMessage(
+        userId: string,
+        chatId: string,
+        messageId: string,
+    ): Promise<DeleteMessageResponseDto> {
         const result = await this.databaseService.$transaction(async (tx) => {
             const [membership, deleteResult] = await Promise.all([
                 tx.participant.findUnique({
@@ -381,32 +402,22 @@ export class MessageService {
             .to(`chat_${chatId}`)
             .emit('message_deleted', { messageId });
 
-        const cacheKeys = [
+        const keysToDelete = [
             `chat:${chatId}:messages`,
             ...result.participants.map((p) => `user:${p.userId}:chats`),
         ];
 
-        // fire and forgot
-        cacheKeys.forEach((key) =>
-            this.redisService
-                .del(key)
-                .catch((err) =>
-                    this.logger.error(
-                        `Error deleting cache for key ${key}:`,
-                        err,
-                    ),
-                ),
-        );
+        await this.redisService.del(...keysToDelete);
 
         return { messageId, chatId };
     }
 
     async editMessage(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
         messageId: string,
         content: string,
-    ) {
+    ): Promise<EditMessageResponseDto> {
         const result = await this.databaseService.$transaction(async (tx) => {
             const [membership, message] = await Promise.all([
                 // Check membership first
@@ -471,18 +482,12 @@ export class MessageService {
             .to(`chat_${chatId}`)
             .emit('message_edited', payload);
 
-        const cacheKeys = [
+        const keysToDelete = [
             `chat:${chatId}:messages`,
             ...result.participants.map((p) => `user:${p.userId}:chats`),
         ];
 
-        cacheKeys.forEach((key) =>
-            this.redisService
-                .del(key)
-                .catch((err) =>
-                    this.logger.error(`Error deleting cache key ${key}:`, err),
-                ),
-        );
+        await this.redisService.del(...keysToDelete);
 
         return {
             messageId,
@@ -496,20 +501,27 @@ export class MessageService {
         chatId: string,
         cursor?: string,
         limit: number = 20,
-    ) {
+    ): Promise<GetPinnedMessagesResponseDto> {
         const cachedKey = `chat:${chatId}:messages:pinned`;
 
         if (!cursor) {
             const cached = await this.redisService.get(cachedKey);
             if (cached) {
-                const parsed = JSON.parse(cached);
-                if (this.cacheValidator.validatePinnedMessagesCache(parsed)) {
-                    this.logger.debug(
-                        'Returning pinned messages from cache...',
+                try {
+                    const parsed: unknown = JSON.parse(cached);
+                    if (
+                        this.cacheValidator.validatePinnedMessagesCache(parsed)
+                    ) {
+                        this.logger.debug(
+                            'Returning pinned messages from cache...',
+                        );
+                        return parsed;
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        'Failed to parse cache JSON. Falling back to DB...',
+                        error,
                     );
-                    return parsed;
-                } else {
-                    this.logger.warn('Failed to get messages from cache!');
                 }
             }
         }
@@ -596,47 +608,40 @@ export class MessageService {
         username: string,
         chatId: string,
         messageId: string,
-    ) {
-        const [membershipResult, message, chatInfo, pinnedByUser] =
-            await Promise.all([
-                // Check 1: Verify membership
-                this.databaseService.participant.findFirst({
-                    where: { chatId, userId },
-                    select: { userId: true },
-                }),
+    ): Promise<PinMessageResponseDto> {
+        const [membershipResult, message, chatInfo] = await Promise.all([
+            // Check 1: Verify membership
+            this.databaseService.participant.findFirst({
+                where: { chatId, userId },
+                select: { userId: true },
+            }),
 
-                // Check 2: Verify message exists + get sender
-                this.databaseService.message.findFirst({
-                    where: { id: messageId, chatId },
-                    select: {
-                        id: true,
-                        content: true,
-                        senderId: true,
-                        sender: {
-                            select: { id: true, username: true },
-                        },
+            // Check 2: Verify message exists + get sender
+            this.databaseService.message.findFirst({
+                where: { id: messageId, chatId },
+                select: {
+                    id: true,
+                    content: true,
+                    senderId: true,
+                    sender: {
+                        select: { id: true, username: true },
                     },
-                }),
+                },
+            }),
 
-                // Check 3: Get chat info + other participants
-                this.databaseService.chat.findUnique({
-                    where: { id: chatId },
-                    select: {
-                        isGroup: true,
-                        participants: {
-                            where: { userId: { not: userId } },
-                            select: { userId: true },
-                            take: 1,
-                        },
+            // Check 3: Get chat info + other participants
+            this.databaseService.chat.findUnique({
+                where: { id: chatId },
+                select: {
+                    isGroup: true,
+                    participants: {
+                        where: { userId: { not: userId } },
+                        select: { userId: true },
+                        take: 1,
                     },
-                }),
-
-                // Check 4: Get pinning user details
-                this.databaseService.user.findUnique({
-                    where: { id: userId },
-                    select: { id: true, username: true },
-                }),
-            ]);
+                },
+            }),
+        ]);
 
         // Validate results
         if (!membershipResult) {
@@ -735,7 +740,11 @@ export class MessageService {
         }
     }
 
-    async unpinMessage(userId: string, chatId: string, messageId: string) {
+    async unpinMessage(
+        userId: string,
+        chatId: string,
+        messageId: string,
+    ): Promise<UnpinMessageResponseDto> {
         const result = await this.databaseService.$transaction(async (tx) => {
             //run in parallel
             const [membership, pinnedRecord] = await Promise.all([

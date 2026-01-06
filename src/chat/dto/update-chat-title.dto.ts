@@ -10,7 +10,7 @@ export class UpdateChatTitleDto {
     })
     @IsString({ message: 'Title must be a string' })
     @MaxLength(30, { message: 'Title is too long(30 max chars)' })
-    @Transform(({ value }) =>
+    @Transform(({ value }: { value: unknown }) =>
         typeof value === 'string' ? value.trim() : value,
     )
     title: string;

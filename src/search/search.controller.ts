@@ -3,7 +3,6 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { SearchService } from './search.service';
 import { SearchQueryDto } from './dto/search.dto';
 import { ReqUser } from 'src/auth/request-user.decorator';
-import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import {
     MessageSearchResultDto,
     SearchChatsResponseDto,
@@ -16,6 +15,7 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @ApiTags('search')
 @ApiBearerAuth()
@@ -61,7 +61,7 @@ export class SearchController {
         description: 'Bad request - Invalid search query',
     })
     async searchChats(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Query() dto: SearchQueryDto,
     ): Promise<SearchChatsResponseDto> {
         return this.searchService.searchChats(me.sub, dto.q);
@@ -118,7 +118,7 @@ export class SearchController {
         description: 'Chat not found',
     })
     async searchInMessages(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Query() dto: SearchQueryDto,
     ): Promise<MessageSearchResultDto[]> {

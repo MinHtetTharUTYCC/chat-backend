@@ -73,7 +73,7 @@ describe('ChatController', () => {
 
             const result = await controller.getAllChats(mockRequestUser);
 
-            expect(chatService.getAllChats).toHaveBeenCalledWith(
+            expect(jest.spyOn(chatService, 'getAllChats')).toHaveBeenCalledWith(
                 mockRequestUser.sub,
             );
             expect(result).toEqual(mockResult);
@@ -94,7 +94,7 @@ describe('ChatController', () => {
 
             const result = await controller.viewChat(mockRequestUser, chatId);
 
-            expect(chatService.viewChat).toHaveBeenCalledWith(
+            expect(jest.spyOn(chatService, 'viewChat')).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatId,
             );
@@ -109,7 +109,7 @@ describe('ChatController', () => {
             mockChatService.startChat.mockResolvedValue(mockResult);
 
             const result = await controller.startChat(mockRequestUser, dto);
-            expect(chatService.startChat).toHaveBeenCalledWith(
+            expect(jest.spyOn(chatService, 'startChat')).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 dto.otherUserId,
             );
@@ -135,7 +135,9 @@ describe('ChatController', () => {
                 chatIdFromParams,
                 dto,
             );
-            expect(messageService.getMessages).toHaveBeenCalledWith(
+            expect(
+                jest.spyOn(messageService, 'getMessages'),
+            ).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatIdFromParams,
                 dto.cursor,
@@ -157,7 +159,9 @@ describe('ChatController', () => {
                 chatIdFromParams,
                 dto,
             );
-            expect(messageService.sendMessage).toHaveBeenCalledWith(
+            expect(
+                jest.spyOn(messageService, 'sendMessage'),
+            ).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatIdFromParams,
                 dto.content,
@@ -181,11 +185,9 @@ describe('ChatController', () => {
                 chatId,
                 messageId,
             );
-            expect(messageService.deleteMessage).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                chatId,
-                messageId,
-            );
+            expect(
+                jest.spyOn(messageService, 'deleteMessage'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, chatId, messageId);
             expect(result).toEqual(mockResult);
         });
     });
@@ -207,7 +209,9 @@ describe('ChatController', () => {
                 messageId,
                 dto,
             );
-            expect(messageService.editMessage).toHaveBeenCalledWith(
+            expect(
+                jest.spyOn(messageService, 'editMessage'),
+            ).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatId,
                 messageId,
@@ -232,7 +236,9 @@ describe('ChatController', () => {
                 chatId,
                 dto,
             );
-            expect(messageService.getPinnedMessages).toHaveBeenCalledWith(
+            expect(
+                jest.spyOn(messageService, 'getPinnedMessages'),
+            ).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatId,
                 dto.cursor,
@@ -254,11 +260,9 @@ describe('ChatController', () => {
                 chatId,
                 messageId,
             );
-            expect(messageService.pinMessage).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                chatId,
-                messageId,
-            );
+            expect(
+                jest.spyOn(messageService, 'pinMessage'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, chatId, messageId);
             expect(result).toEqual(mockResult);
         });
     });
@@ -278,11 +282,9 @@ describe('ChatController', () => {
                 chatId,
                 messageId,
             );
-            expect(messageService.unpinMessage).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                chatId,
-                messageId,
-            );
+            expect(
+                jest.spyOn(messageService, 'unpinMessage'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, chatId, messageId);
             expect(result).toEqual(mockResult);
         });
     });
@@ -303,11 +305,9 @@ describe('ChatController', () => {
                 chatId,
                 dto,
             );
-            expect(chatService.updateChatTitle).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                chatId,
-                dto.title,
-            );
+            expect(
+                jest.spyOn(chatService, 'updateChatTitle'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, chatId, dto.title);
             expect(result).toEqual(mockResult);
         });
     });
@@ -330,11 +330,9 @@ describe('ChatController', () => {
                 mockRequestUser,
                 dto,
             );
-            expect(chatService.createGroupChat).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                dto.title,
-                dto.userIds,
-            );
+            expect(
+                jest.spyOn(chatService, 'createGroupChat'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, dto.title, dto.userIds);
             expect(result).toEqual(mockResult);
         });
     });
@@ -355,11 +353,9 @@ describe('ChatController', () => {
                 chatId,
                 dto,
             );
-            expect(chatService.addToGroupChat).toHaveBeenCalledWith(
-                mockRequestUser.sub,
-                chatId,
-                dto.userIds,
-            );
+            expect(
+                jest.spyOn(chatService, 'addToGroupChat'),
+            ).toHaveBeenCalledWith(mockRequestUser.sub, chatId, dto.userIds);
             expect(result).toEqual(mockResult);
         });
     });
@@ -374,7 +370,7 @@ describe('ChatController', () => {
             mockChatService.joinGroup.mockResolvedValue(mockResult);
 
             const result = await controller.joinGroup(mockRequestUser, chatId);
-            expect(chatService.joinGroup).toHaveBeenCalledWith(
+            expect(jest.spyOn(chatService, 'joinGroup')).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatId,
             );
@@ -392,7 +388,7 @@ describe('ChatController', () => {
             mockChatService.leaveGroup.mockResolvedValue(mockResult);
 
             const result = await controller.leaveGroup(mockRequestUser, chatId);
-            expect(chatService.leaveGroup).toHaveBeenCalledWith(
+            expect(jest.spyOn(chatService, 'leaveGroup')).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatId,
             );

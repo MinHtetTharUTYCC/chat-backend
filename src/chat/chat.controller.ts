@@ -3,12 +3,10 @@ import {
     Controller,
     Delete,
     Get,
-    Logger,
     Param,
     Patch,
     Post,
     Query,
-    Req,
     UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -22,7 +20,6 @@ import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { MessagesPaginationDto } from './dto/messages-pagination.dto';
-import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { ReqUser } from 'src/auth/request-user.decorator';
 import { InviteToChatDto } from './dto/invite-to-chat.dto';
 import {
@@ -55,6 +52,7 @@ import {
     PinMessageResponseDto,
     UnpinMessageResponseDto,
 } from './dto/message-response.dto';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @ApiTags('chats')
 @ApiBearerAuth()
@@ -77,7 +75,9 @@ export class ChatController {
         status: 401,
         description: 'Unauthorized',
     })
-    async getAllChats(@ReqUser() me: RequestUser): Promise<ChatListItemDto[]> {
+    async getAllChats(
+        @ReqUser() me: authInterfaces.RequestUser,
+    ): Promise<ChatListItemDto[]> {
         return this.chatService.getAllChats(me.sub);
     }
 
@@ -92,7 +92,9 @@ export class ChatController {
         status: 401,
         description: 'Unauthorized',
     })
-    async getMyChatsIds(@ReqUser() me: RequestUser): Promise<string[]> {
+    async getMyChatsIds(
+        @ReqUser() me: authInterfaces.RequestUser,
+    ): Promise<string[]> {
         return this.chatService.getMyChatsIds(me.sub);
     }
 
@@ -116,7 +118,7 @@ export class ChatController {
         description: 'User not found',
     })
     async startChat(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Body() startChatDto: StartChatDto,
     ): Promise<StartChatResponseDto> {
         return this.chatService.startChat(me, startChatDto.otherUserId);
@@ -177,7 +179,7 @@ export class ChatController {
         description: 'Chat or message not found',
     })
     async getMessages(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Query()
         query: MessagesPaginationDto,
@@ -220,7 +222,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async sendMessage(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Body() sendMessageDto: SendMessageDto,
     ): Promise<SendMessageResponseDto> {
@@ -262,7 +264,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async viewChat(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
     ): Promise<FullChatDto | PreviewChatDto> {
         return this.chatService.viewChat(me.sub, chatId);
@@ -298,7 +300,7 @@ export class ChatController {
         description: 'Chat or message not found',
     })
     async deleteMessage(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Param('messageId') messageId: string,
     ): Promise<DeleteMessageResponseDto> {
@@ -335,7 +337,7 @@ export class ChatController {
         description: 'Chat or message not found',
     })
     async editMessage(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Param('messageId') messageId: string,
         @Body() dto: EditMessageDto,
@@ -384,7 +386,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async getPinnedMessages(
-        @ReqUser() user: RequestUser,
+        @ReqUser() user: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Query() dto: PaginationDto,
     ): Promise<GetPinnedMessagesResponseDto> {
@@ -430,7 +432,7 @@ export class ChatController {
         description: 'Message is already pinned',
     })
     async pinMessage(
-        @ReqUser() user: RequestUser,
+        @ReqUser() user: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Param('messageId') messageId: string,
     ): Promise<PinMessageResponseDto> {
@@ -475,7 +477,7 @@ export class ChatController {
         description: 'Chat, message, or pin not found',
     })
     async unpinMessage(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Param('messageId') messageId: string,
     ): Promise<UnpinMessageResponseDto> {
@@ -507,7 +509,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async updateChatTitle(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Body() dto: UpdateChatTitleDto,
     ): Promise<UpdateChatTitleResponseDto> {
@@ -530,7 +532,7 @@ export class ChatController {
         description: 'Unauthorized',
     })
     async createGroupChat(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Body() dto: CreateGroupChatDto,
     ): Promise<CreateGroupChatResponseDto> {
         return this.chatService.createGroupChat(me, dto.title, dto.userIds);
@@ -567,7 +569,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async addToGroupChat(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Body() dto: AddToChatDto,
     ): Promise<AddToGroupChatResponseDto> {
@@ -605,7 +607,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async inviteToGroup(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Body() dto: InviteToChatDto,
     ): Promise<InviteToGroupResponseDto> {
@@ -644,7 +646,7 @@ export class ChatController {
         description: 'Chat not found or not a group',
     })
     async searchUsersToInvite(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
         @Query('q') q: string,
     ): Promise<UserDto[]> {
@@ -676,7 +678,7 @@ export class ChatController {
         description: 'Conflict - already a member of this chat or not a group',
     })
     async joinGroup(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
     ): Promise<JoinGroupResponseDto> {
         return this.chatService.joinGroup(me, chatId);
@@ -707,7 +709,7 @@ export class ChatController {
         description: 'Chat not found',
     })
     async leaveGroup(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Param('chatId') chatId: string,
     ): Promise<LeaveGroupResponseDto> {
         return this.chatService.leaveGroup(me, chatId);

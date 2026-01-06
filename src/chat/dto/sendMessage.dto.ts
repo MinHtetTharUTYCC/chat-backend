@@ -7,5 +7,6 @@ export class SendMessageDto {
         example: 'Hello, how are you?',
     })
     @IsNotEmpty()
+    @MinLength(1)
     content: string;
 }

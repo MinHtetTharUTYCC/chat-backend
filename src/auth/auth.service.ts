@@ -10,7 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
 
-export type JwtPayload = {
+type Payload = {
     sub: string;
     username: string;
 };
@@ -24,7 +24,7 @@ export class AuthService {
     ) {}
 
     async getTokens(userId: string, username: string) {
-        const payload: JwtPayload = {
+        const payload: Payload = {
             sub: userId,
             username,
         };

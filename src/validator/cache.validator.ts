@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ChatListItemDto, FullChatDto } from 'src/chat/dto/chat-response.dto';
-import { GetMessagesResponseDto } from 'src/chat/dto/message-response.dto';
+import {
+    GetMessagesResponseDto,
+    GetPinnedMessagesResponseDto,
+} from 'src/chat/dto/message-response.dto';
 
 @Injectable()
 export class CacheValidator {
@@ -24,7 +27,9 @@ export class CacheValidator {
             Array.isArray(data.messages),
         );
     }
-    validatePinnedMessagesCache(data: unknown): data is GetMessagesResponseDto {
+    validatePinnedMessagesCache(
+        data: unknown,
+    ): data is GetPinnedMessagesResponseDto {
         return Boolean(
             data &&
             typeof data === 'object' &&

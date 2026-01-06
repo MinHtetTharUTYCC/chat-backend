@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { NotificationType } from 'generated/prisma';
 import { RedisService } from 'src/redis/redis.service';
-import { RequestUser } from 'src/auth/interfaces/request-user.interface';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 describe('ChatService', () => {
     let service: ChatService;
     let databaseService: DatabaseService;
@@ -121,8 +121,10 @@ describe('ChatService', () => {
 
             const result = await service.getAllChats(userId);
 
-            expect(redisService.get).toHaveBeenCalledWith(cachedKey);
-            expect(redisService.set).not.toHaveBeenCalled(); //should not save to cache on a hit
+            expect(jest.spyOn(redisService, 'get')).toHaveBeenCalledWith(
+                cachedKey,
+            );
+            expect(jest.spyOn(redisService, 'set')).not.toHaveBeenCalled(); //should not save to cache on a hit
             expect(result).toEqual(mockChatsResult);
         });
 
@@ -134,7 +136,9 @@ describe('ChatService', () => {
 
             const result = await service.getAllChats(userId);
 
-            expect(redisService.get).toHaveBeenCalledWith(cachedKey);
+            expect(jest.spyOn(redisService, 'get')).toHaveBeenCalledWith(
+                cachedKey,
+            );
             expect(databaseService.chat.findMany).toHaveBeenCalledTimes(1);
 
             //check if findMany was called with correct query struture
@@ -165,7 +169,7 @@ describe('ChatService', () => {
                 orderBy: [{ lastMessageAt: 'desc' }, { updatedAt: 'desc' }],
             });
 
-            expect(redisService.set).toHaveBeenCalledWith(
+            expect(jest.spyOn(redisService, 'set')).toHaveBeenCalledWith(
                 cachedKey,
                 mockChatsResult,
                 TTL,
@@ -290,9 +294,11 @@ describe('ChatService', () => {
             const result = await service.viewChat('user-id', chatId);
 
             //ASSERT
-            expect(redisService.get).toHaveBeenCalledWith(cachedKey);
+            expect(jest.spyOn(redisService, 'get')).toHaveBeenCalledWith(
+                cachedKey,
+            );
             expect(databaseService.chat.findUnique).not.toHaveBeenCalled();
-            expect(redisService.set).not.toHaveBeenCalled();
+            expect(jest.spyOn(redisService, 'set')).not.toHaveBeenCalled();
             expect(result).toEqual(mockResult);
         });
 
@@ -306,7 +312,7 @@ describe('ChatService', () => {
             await expect(service.viewChat('user-id', chatId)).rejects.toThrow(
                 NotFoundException,
             );
-            expect(redisService.set).not.toHaveBeenCalled();
+            expect(jest.spyOn(redisService, 'set')).not.toHaveBeenCalled();
         });
 
         it('should return fetched data  and set catch-data (Cache Miss)', async () => {
@@ -320,7 +326,7 @@ describe('ChatService', () => {
             // ASSERT
             expect(mockRedisService.get).toHaveBeenCalled();
             expect(databaseService.chat.findUnique).toHaveBeenCalledTimes(1);
-            expect(redisService.set).toHaveBeenCalledWith(
+            expect(jest.spyOn(redisService, 'set')).toHaveBeenCalledWith(
                 cachedKey,
                 result,
                 300,
@@ -332,7 +338,7 @@ describe('ChatService', () => {
     describe('startChat', () => {
         const userId = 'my-initiator-id';
         const username = 'my-username';
-        const me: RequestUser = { sub: userId, username };
+        const me: authInterfaces.RequestUser = { sub: userId, username };
         const otherUserId = 'other-recipient-id';
         const existingChatId = 'existing-chat-dm-1';
 
@@ -395,7 +401,7 @@ describe('ChatService', () => {
                 notificationService.createNotification,
             ).not.toHaveBeenCalled();
             expect(mockEmit).not.toHaveBeenCalled();
-            expect(redisService.del).not.toHaveBeenCalled();
+            expect(jest.spyOn(redisService, 'del')).not.toHaveBeenCalled();
             expect(result).toEqual(mockExistingChat);
         });
         // Path: 4 Success - Start chat creation
@@ -437,13 +443,13 @@ describe('ChatService', () => {
                     data: mockNewChat,
                 }),
             );
-            expect(redisService.del).toHaveBeenCalledWith(
+            expect(jest.spyOn(redisService, 'del')).toHaveBeenCalledWith(
                 `user:${userId}:chats`,
             );
-            expect(redisService.del).toHaveBeenCalledWith(
+            expect(jest.spyOn(redisService, 'del')).toHaveBeenCalledWith(
                 `user:${otherUserId}:chats`,
             );
-            expect(redisService.del).toHaveBeenCalledTimes(2);
+            expect(jest.spyOn(redisService, 'del')).toHaveBeenCalledTimes(2);
 
             expect(result).toEqual(mockNewChat);
         });

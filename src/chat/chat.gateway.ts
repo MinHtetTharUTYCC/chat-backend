@@ -21,6 +21,7 @@ import {
     ValidationPipe,
 } from '@nestjs/common';
 import { TypingDto } from './dto/typing.dto';
+import { JwtPayloadOutput } from 'src/auth/interfaces/jwt-payload.interface';
 
 @Injectable()
 @WebSocketGateway({
@@ -44,22 +45,27 @@ export class ChatGateway
         private readonly presenceService: PresenceService,
     ) {}
 
-    async afterInit(server: Server) {
+    afterInit(server: Server) {
         server.use((socket, next) => {
             try {
-                const token = socket.handshake.auth?.token;
+                const token = socket.handshake.auth?.token as
+                    | string
+                    | undefined;
                 if (!token) return next(new Error('Missing token'));
 
-                const payload = this.jwtService.verify(token, {
-                    secret: process.env.JWT_ACCESS_SECRET,
-                });
+                const payload = this.jwtService.verify<JwtPayloadOutput>(
+                    token,
+                    {
+                        secret: process.env.JWT_ACCESS_SECRET,
+                    },
+                );
 
                 socket.data.user = {
                     sub: payload.sub,
                     username: payload.username,
                 };
                 next();
-            } catch (error) {
+            } catch {
                 next(new Error('Unauthorized'));
             }
         });

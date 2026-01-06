@@ -1,6 +1,8 @@
 import {
+    BadRequestException,
     Body,
     Controller,
+    ForbiddenException,
     HttpCode,
     HttpStatus,
     Post,
@@ -29,7 +31,7 @@ import {
     RegisterResponseDto,
 } from './dto/response.auth.dto';
 import { ReqUser } from './request-user.decorator';
-import type { RequestUser } from './interfaces/request-user.interface';
+import * as authInterfaces from './interfaces/auth.interfaces';
 
 @Controller('auth')
 export class AuthController {
@@ -198,11 +200,15 @@ export class AuthController {
         description: 'Too many requests - Rate limit exceeded',
     })
     async refresh(
-        @Req() req,
-        @ReqUser() me: RequestUser,
+        @Req() req: authInterfaces.RequestWithRefreshToken,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Res({ passthrough: true }) res: express.Response,
     ) {
         const oldRT = req.user.refreshToken;
+
+        if (!oldRT) {
+            throw new ForbiddenException('Failed to refresh section');
+        }
 
         // Generate new tokens
         const { accessToken, refreshToken } =
@@ -245,7 +251,7 @@ export class AuthController {
         description: 'Too many requests - Rate limit exceeded',
     })
     async logout(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Res({ passthrough: true }) res: express.Response,
     ) {
         const userId = me.sub;

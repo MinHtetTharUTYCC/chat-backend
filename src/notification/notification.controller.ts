@@ -1,9 +1,8 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 import { PaginationDto } from 'src/chat/dto/pagination.dto';
 import { ReqUser } from 'src/auth/request-user.decorator';
-import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import {
     ApiBearerAuth,
     ApiOperation,
@@ -12,6 +11,7 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { PaginatedNotificationsResponseDto } from './dto/response.notification.dto';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -73,7 +73,7 @@ export class NotificationController {
     })
     @Get('/')
     async getNotifications(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Query() query: PaginationDto,
     ) {
         return this.notificationService.getNotifications(

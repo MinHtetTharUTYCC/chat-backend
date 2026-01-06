@@ -12,7 +12,6 @@ import { NotificationService } from 'src/notification/notification.service';
 import { MessageService } from 'src/message/message.service';
 import { RedisService } from 'src/redis/redis.service';
 import { NotificationType, Prisma } from 'generated/prisma';
-import { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { generateDmKey } from 'src/utils/chat.utils';
 import {
     AddToGroupChatResponseDto,
@@ -28,6 +27,7 @@ import {
     UserDto,
 } from './dto/chat-response.dto';
 import { CacheValidator } from 'src/validator/cache.validator';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @Injectable()
 export class ChatService {
@@ -74,12 +74,17 @@ export class ChatService {
         //check redis
         const cached = await this.redisService.get(cacheKey);
         if (cached) {
-            const parsed = JSON.parse(cached);
-            if (this.cacheValidtor.validateChatsListCache(parsed)) {
-                this.logger.debug('Returning chats from cache..');
-                return parsed;
-            } else {
-                this.logger.warn('Feiled to get chats from cache!');
+            try {
+                const parsed: unknown = JSON.parse(cached);
+                if (this.cacheValidtor.validateChatsListCache(parsed)) {
+                    this.logger.debug('Returning chats list from cache..');
+                    return parsed;
+                }
+            } catch (error) {
+                this.logger.error(
+                    'Failed to parse cache JSON. Falling back to DB...',
+                    error,
+                );
             }
         }
 
@@ -127,14 +132,20 @@ export class ChatService {
 
         const cached = await this.redisService.get(cachedKey);
         if (cached) {
-            const parsed = cached ? JSON.parse(cached) : null;
-            if (this.cacheValidtor.validateFullChatCache(parsed)) {
-                this.logger.debug('Returning full chat from cache..');
-                return parsed;
-            } else {
-                this.logger.debug('Failed to get full chat from cache!');
+            try {
+                const parsed: unknown = JSON.parse(cached);
+                if (this.cacheValidtor.validateFullChatCache(parsed)) {
+                    this.logger.debug('Returning full chat from cache..');
+                    return parsed;
+                }
+            } catch (error) {
+                this.logger.error(
+                    'Failed to parse cache JSON. Falling back to DB...',
+                    error,
+                );
             }
         }
+
         const chat = await this.databaseService.chat.findUnique({
             where: {
                 id: chatId, //'am i participant?' is already checked at viewChat()
@@ -210,7 +221,7 @@ export class ChatService {
     }
 
     async startChat(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         otherUserId: string,
     ): Promise<StartChatResponseDto> {
         if (me.sub === otherUserId) {
@@ -279,7 +290,7 @@ export class ChatService {
     }
 
     private async runNewChatSideEffects(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         otherUserId: string,
         chatId: string,
     ) {
@@ -355,7 +366,7 @@ export class ChatService {
     }
 
     async updateChatTitle(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
         newTitle: string,
     ): Promise<UpdateChatTitleResponseDto> {
@@ -463,7 +474,7 @@ export class ChatService {
     }
 
     async createGroupChat(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         title: string,
         userIds: string[],
     ): Promise<CreateGroupChatResponseDto> {
@@ -550,7 +561,7 @@ export class ChatService {
     }
 
     async addToGroupChat(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
         userIds: string[],
     ): Promise<AddToGroupChatResponseDto> {
@@ -714,7 +725,7 @@ export class ChatService {
         };
     }
     async inviteToGroupChat(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
         userIds: string[],
     ): Promise<InviteToGroupResponseDto> {
@@ -832,7 +843,7 @@ export class ChatService {
     }
 
     async joinGroup(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
     ): Promise<JoinGroupResponseDto> {
         const { chat, existingParticipant } =
@@ -900,7 +911,7 @@ export class ChatService {
     }
 
     async leaveGroup(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
     ): Promise<LeaveGroupResponseDto> {
         await this.messageService.verifyMembership(me.sub, chatId);
@@ -946,7 +957,7 @@ export class ChatService {
     }
 
     async searchUsersToInvite(
-        me: RequestUser,
+        me: authInterfaces.RequestUser,
         chatId: string,
         q?: string,
     ): Promise<UserDto[]> {
