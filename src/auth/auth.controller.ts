@@ -28,6 +28,8 @@ import {
     RefreshResponseDto,
     RegisterResponseDto,
 } from './dto/response.auth.dto';
+import { ReqUser } from './request-user.decorator';
+import type { RequestUser } from './interfaces/request-user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -197,14 +199,14 @@ export class AuthController {
     })
     async refresh(
         @Req() req,
+        @ReqUser() me: RequestUser,
         @Res({ passthrough: true }) res: express.Response,
     ) {
-        const { sub: userId } = req.user;
         const oldRT = req.user.refreshToken;
 
         // Generate new tokens
         const { accessToken, refreshToken } =
-            await this.authService.refreshTokens(userId, oldRT);
+            await this.authService.refreshTokens(me.sub, oldRT);
 
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
@@ -243,10 +245,10 @@ export class AuthController {
         description: 'Too many requests - Rate limit exceeded',
     })
     async logout(
-        @Req() req,
+        @ReqUser() me: RequestUser,
         @Res({ passthrough: true }) res: express.Response,
     ) {
-        const userId = req.user.sub;
+        const userId = me.sub;
 
         // clear refreshToken at DB
         await this.authService.logout(userId);

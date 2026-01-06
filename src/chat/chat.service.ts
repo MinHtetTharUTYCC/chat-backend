@@ -14,6 +14,20 @@ import { RedisService } from 'src/redis/redis.service';
 import { NotificationType, Prisma } from 'generated/prisma';
 import { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import { generateDmKey } from 'src/utils/chat.utils';
+import {
+    AddToGroupChatResponseDto,
+    ChatListItemDto,
+    CreateGroupChatResponseDto,
+    FullChatDto,
+    InviteToGroupResponseDto,
+    JoinGroupResponseDto,
+    LeaveGroupResponseDto,
+    PreviewChatDto,
+    StartChatResponseDto,
+    UpdateChatTitleResponseDto,
+    UserDto,
+} from './dto/chat-response.dto';
+import { CacheValidator } from 'src/validator/cache.validator';
 
 @Injectable()
 export class ChatService {
@@ -22,6 +36,14 @@ export class ChatService {
     // Standard include pattern for chat items in list/response views
     private readonly chatItemInclude = {
         messages: {
+            include: {
+                sender: {
+                    select: {
+                        id: true,
+                        username: true,
+                    },
+                },
+            },
             orderBy: { createdAt: 'desc' as const },
             take: 1,
         },
@@ -42,19 +64,23 @@ export class ChatService {
         private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
         private readonly messageService: MessageService,
+        private readonly cacheValidtor: CacheValidator,
         private redisService: RedisService,
     ) {}
 
-    async getAllChats(userId: string) {
+    async getAllChats(userId: string): Promise<ChatListItemDto[]> {
         const cacheKey = `user:${userId}:chats`;
 
         //check redis
         const cached = await this.redisService.get(cacheKey);
-        const cachedResult = cached ? JSON.parse(cached) : null;
-
-        if (cachedResult) {
-            this.logger.debug('Returning chats from cache..');
-            return cachedResult;
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (this.cacheValidtor.validateChatsListCache(parsed)) {
+                this.logger.debug('Returning chats from cache..');
+                return parsed;
+            } else {
+                this.logger.warn('Feiled to get chats from cache!');
+            }
         }
 
         const chats = await this.databaseService.chat.findMany({
@@ -63,24 +89,7 @@ export class ChatService {
                     some: { userId },
                 },
             },
-            include: {
-                messages: {
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    take: 1,
-                },
-                participants: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: this.chatItemInclude,
             orderBy: [
                 { lastMessageAt: { sort: 'desc' } },
                 { updatedAt: 'desc' },
@@ -113,16 +122,19 @@ export class ChatService {
         return this.getPreviewChat(chatId);
     }
 
-    async getFullChat(chatId: string) {
+    async getFullChat(chatId: string): Promise<FullChatDto> {
         const cachedKey = `chat:${chatId}`;
+
         const cached = await this.redisService.get(cachedKey);
-        const cachedResult = cached ? JSON.parse(cached) : null;
-
-        if (cachedResult) {
-            this.logger.debug('Returning chat from cache..');
-            return cachedResult;
+        if (cached) {
+            const parsed = cached ? JSON.parse(cached) : null;
+            if (this.cacheValidtor.validateFullChatCache(parsed)) {
+                this.logger.debug('Returning full chat from cache..');
+                return parsed;
+            } else {
+                this.logger.debug('Failed to get full chat from cache!');
+            }
         }
-
         const chat = await this.databaseService.chat.findUnique({
             where: {
                 id: chatId, //'am i participant?' is already checked at viewChat()
@@ -161,7 +173,7 @@ export class ChatService {
         return chatData;
     }
 
-    async getPreviewChat(chatId: string) {
+    async getPreviewChat(chatId: string): Promise<PreviewChatDto> {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId },
             select: {
@@ -197,7 +209,10 @@ export class ChatService {
         };
     }
 
-    async startChat(me: RequestUser, otherUserId: string) {
+    async startChat(
+        me: RequestUser,
+        otherUserId: string,
+    ): Promise<StartChatResponseDto> {
         if (me.sub === otherUserId) {
             throw new BadRequestException('You cannot chat with yourself');
         }
@@ -247,6 +262,8 @@ export class ChatService {
                 throw error;
             }
         });
+
+        if (!result.chat) throw new BadRequestException('Failed to start chat');
 
         if (result.isNew) {
             this.runNewChatSideEffects(me, otherUserId, result.chat.id).catch(
@@ -337,7 +354,11 @@ export class ChatService {
         return chats.map((chat) => chat.id);
     }
 
-    async updateChatTitle(me: RequestUser, chatId: string, newTitle: string) {
+    async updateChatTitle(
+        me: RequestUser,
+        chatId: string,
+        newTitle: string,
+    ): Promise<UpdateChatTitleResponseDto> {
         const formattedTitle = newTitle.trim() || null;
 
         const { participants } = await this.databaseService.$transaction(
@@ -370,7 +391,7 @@ export class ChatService {
                     );
                 }
 
-                const result = await tx.chat.update({
+                await tx.chat.update({
                     where: { id: chatId },
                     data: { title: formattedTitle },
                 });
@@ -441,7 +462,11 @@ export class ChatService {
         return { chatId, title: formattedTitle };
     }
 
-    async createGroupChat(me: RequestUser, title: string, userIds: string[]) {
+    async createGroupChat(
+        me: RequestUser,
+        title: string,
+        userIds: string[],
+    ): Promise<CreateGroupChatResponseDto> {
         const uniqueUserIds = new Set<string>([...userIds, me.sub]);
         const usersToParticipate = Array.from(uniqueUserIds).map((id) => ({
             userId: id,
@@ -461,19 +486,7 @@ export class ChatService {
                     create: usersToParticipate,
                 },
             },
-            include: {
-                messages: true,
-                participants: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                username: true,
-                            },
-                        },
-                    },
-                },
-            },
+            include: this.chatItemInclude,
         });
 
         uniqueUserIds.delete(me.sub); //deduct me
@@ -536,7 +549,11 @@ export class ChatService {
         return groupChat;
     }
 
-    async addToGroupChat(me: RequestUser, chatId: string, userIds: string[]) {
+    async addToGroupChat(
+        me: RequestUser,
+        chatId: string,
+        userIds: string[],
+    ): Promise<AddToGroupChatResponseDto> {
         const requestedUserIds = new Set(userIds.filter((id) => id !== me.sub));
         if (requestedUserIds.size === 0) {
             throw new BadRequestException('No valid users to add');
@@ -700,7 +717,7 @@ export class ChatService {
         me: RequestUser,
         chatId: string,
         userIds: string[],
-    ) {
+    ): Promise<InviteToGroupResponseDto> {
         const requestedUserIds = new Set(userIds.filter((id) => id !== me.sub));
         if (requestedUserIds.size === 0) {
             throw new BadRequestException('No valid users to add');
@@ -814,7 +831,10 @@ export class ChatService {
         };
     }
 
-    async joinGroup(me: RequestUser, chatId: string) {
+    async joinGroup(
+        me: RequestUser,
+        chatId: string,
+    ): Promise<JoinGroupResponseDto> {
         const { chat, existingParticipant } =
             await this.databaseService.$transaction(async (tx) => {
                 const chat = await tx.chat.findUnique({
@@ -879,7 +899,10 @@ export class ChatService {
         };
     }
 
-    async leaveGroup(me: RequestUser, chatId: string) {
+    async leaveGroup(
+        me: RequestUser,
+        chatId: string,
+    ): Promise<LeaveGroupResponseDto> {
         await this.messageService.verifyMembership(me.sub, chatId);
 
         const participant = await this.databaseService.participant.delete({
@@ -922,7 +945,11 @@ export class ChatService {
         };
     }
 
-    async searchUsersToInvite(me: RequestUser, chatId: string, q?: string) {
+    async searchUsersToInvite(
+        me: RequestUser,
+        chatId: string,
+        q?: string,
+    ): Promise<UserDto[]> {
         const chat = await this.databaseService.chat.findUnique({
             where: { id: chatId },
             select: {

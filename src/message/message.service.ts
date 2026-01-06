@@ -12,6 +12,7 @@ import { ChatGateway } from 'src/chat/chat.gateway';
 import { DatabaseService } from 'src/database/database.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { RedisService } from 'src/redis/redis.service';
+import { CacheValidator } from 'src/validator/cache.validator';
 
 @Injectable()
 export class MessageService {
@@ -21,6 +22,7 @@ export class MessageService {
         private readonly databaseService: DatabaseService,
         private readonly chatGateway: ChatGateway,
         private readonly notificationService: NotificationService,
+        private readonly cacheValidator: CacheValidator,
         private redisService: RedisService,
     ) {}
 
@@ -125,11 +127,14 @@ export class MessageService {
         // Cache only for initial load (latest messages, no params)
         if (!activeCursor && !jumpingToMessage && !jumpingToDate) {
             const cacheded = await this.redisService.get(latestMessageKey);
-            const cachedResult = cacheded ? JSON.parse(cacheded) : null;
-
-            if (cachedResult) {
-                this.logger.debug('Returning messages + meta from cache...');
-                return cachedResult;
+            if (cacheded) {
+                const parsed = JSON.parse(cacheded);
+                if (this.cacheValidator.validateMessagesCache(parsed)) {
+                    this.logger.debug('Returning messages from cache...');
+                    return parsed;
+                } else {
+                    this.logger.warn('Failed to get messages from cache!');
+                }
             }
         }
 
@@ -496,11 +501,16 @@ export class MessageService {
 
         if (!cursor) {
             const cached = await this.redisService.get(cachedKey);
-            const cachedResult = cached ? JSON.parse(cached) : null;
-
-            if (cachedResult) {
-                this.logger.debug('Returning pinned messages from cache...');
-                return cachedResult;
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (this.cacheValidator.validatePinnedMessagesCache(parsed)) {
+                    this.logger.debug(
+                        'Returning pinned messages from cache...',
+                    );
+                    return parsed;
+                } else {
+                    this.logger.warn('Failed to get messages from cache!');
+                }
             }
         }
 
@@ -587,10 +597,6 @@ export class MessageService {
         chatId: string,
         messageId: string,
     ) {
-        const startTime = Date.now();
-        this.logger.debug('[PIN] Starting pinMessage');
-
-        const t1 = Date.now();
         const [membershipResult, message, chatInfo, pinnedByUser] =
             await Promise.all([
                 // Check 1: Verify membership
@@ -631,7 +637,6 @@ export class MessageService {
                     select: { id: true, username: true },
                 }),
             ]);
-        this.logger.debug(`[PIN] ALL parallel checks: ${Date.now() - t1}ms`);
 
         // Validate results
         if (!membershipResult) {
@@ -643,8 +648,7 @@ export class MessageService {
 
         try {
             // Create pin (lean)
-            const t2 = Date.now();
-            const pinMessage = await this.databaseService.pinnedMessage.create({
+            await this.databaseService.pinnedMessage.create({
                 data: {
                     pinnedByUserId: userId,
                     chatId,
@@ -657,9 +661,6 @@ export class MessageService {
                     messageId: true,
                 },
             });
-            this.logger.debug(
-                `[PIN] pinnedMessage.create: ${Date.now() - t2}ms`,
-            );
 
             if (!chatInfo) throw new NotFoundException('Chat not found');
 
@@ -673,7 +674,6 @@ export class MessageService {
             };
 
             // Fire socket events + notification in background
-            const t3 = Date.now();
 
             if (chatInfo.isGroup) {
                 this.chatGateway.server
@@ -716,26 +716,16 @@ export class MessageService {
                         );
                 }
             }
-            this.logger.debug(`[PIN] Socket events: ${Date.now() - t3}ms`);
 
-            // Clear cache (parallel if possible)
-            const t4 = Date.now();
-            await Promise.all([
-                this.redisService.del(`chat:${chatId}:messages`),
-                this.redisService.del(`chat:${chatId}:messages:pinned`),
-            ]);
-
-            this.logger.debug(`[PIN] Redis del: ${Date.now() - t4}ms`);
-
-            const totalTime = Date.now() - startTime;
-            this.logger.log(`[PIN] TOTAL TIME: ${totalTime}ms`);
+            // Clear cache
+            const keysToDelete = [
+                `chat:${chatId}:messages`,
+                `chat:${chatId}:messages:pinned`,
+            ];
+            await this.redisService.del(...keysToDelete);
 
             return { messageId, chatId };
         } catch (error) {
-            this.logger.error(
-                `[PIN] Error after ${Date.now() - startTime}ms`,
-                error,
-            );
             if (error instanceof PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
                     throw new ConflictException('Message is already pinned');
@@ -746,11 +736,6 @@ export class MessageService {
     }
 
     async unpinMessage(userId: string, chatId: string, messageId: string) {
-        const startTime = Date.now();
-        this.logger.debug('[UNPIN] Starting unpinMessage');
-
-        const t1 = Date.now();
-
         const result = await this.databaseService.$transaction(async (tx) => {
             //run in parallel
             const [membership, pinnedRecord] = await Promise.all([
@@ -798,27 +783,18 @@ export class MessageService {
 
             return { messageId, chatId };
         });
-        this.logger.debug(
-            `[UNPIN] Transaction (all DB ops): ${Date.now() - t1}ms`,
-        );
 
-        // Emit socket event + clear cache in parallel (non-blocking)
-        const t2 = Date.now();
-        await Promise.all([
-            // socket emit(sync, fast)
-            Promise.resolve(
-                this.chatGateway.server
-                    .to(`chat_${chatId}`)
-                    .emit('pin_removed', { messageId }),
-            ),
-            // clear cache
-            this.redisService.del(`chat:${chatId}:messages`),
-            this.redisService.del(`chat:${chatId}:messages:pinned`),
-        ]);
-        this.logger.debug(`[UNPIN] socket + cache: ${Date.now() - t2}ms`);
+        // Emit socket event
+        this.chatGateway.server
+            .to(`chat_${chatId}`)
+            .emit('pin_removed', { messageId });
 
-        const totalTime = Date.now() - startTime;
-        this.logger.log(`[UNPIN] TOTAL TIME: ${totalTime}ms`);
+        // clear cache
+        const keysToDelete = [
+            `chat:${chatId}:messages`,
+            `chat:${chatId}:messages:pinned`,
+        ];
+        await this.redisService.del(...keysToDelete);
 
         return result;
     }

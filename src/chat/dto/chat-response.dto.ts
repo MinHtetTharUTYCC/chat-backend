@@ -40,8 +40,8 @@ export class ChatListItemDto {
     @ApiProperty({ description: 'Chat ID' })
     id: string;
 
-    @ApiPropertyOptional({ description: 'Chat title' })
-    title?: string;
+    @ApiProperty({ description: 'Chat title' })
+    title: string | null;
 
     @ApiProperty({ description: 'Whether this is a group chat' })
     isGroup: boolean;
@@ -49,22 +49,17 @@ export class ChatListItemDto {
     @ApiProperty({ description: 'Chat creation date' })
     createdAt: Date;
 
-    @ApiPropertyOptional({ description: 'Last message update time' })
-    lastMessageAt?: Date;
+    @ApiProperty({ description: 'Last message update time' })
+    lastMessageAt: Date | null;
 
-    @ApiPropertyOptional({ description: 'Latest message in the chat' })
-    messages?: MessageDto[];
+    @ApiProperty({ description: 'Latest message in the chat' })
+    messages: MessageDto[];
 
     @ApiProperty({ description: 'Chat participants' })
     participants: ParticipantDto[];
 
     @ApiPropertyOptional({ description: 'Last update date' })
-    updatedAt?: Date;
-}
-
-export class GetAllChatsResponseDto {
-    @ApiProperty({ isArray: true, type: ChatListItemDto })
-    data: ChatListItemDto[];
+    updatedAt: Date;
 }
 
 export class ChatIdDto {
@@ -72,17 +67,12 @@ export class ChatIdDto {
     id: string;
 }
 
-export class GetMyChatsIdsResponseDto {
-    @ApiProperty({ isArray: true, type: String })
-    data: string[];
-}
-
 export class FullChatDto {
     @ApiProperty({ description: 'Chat ID' })
     id: string;
 
-    @ApiPropertyOptional({ description: 'Chat title' })
-    title?: string;
+    @ApiProperty({ description: 'Chat title' })
+    title: string | null;
 
     @ApiProperty({ description: 'Whether this is a group chat' })
     isGroup: boolean;
@@ -101,8 +91,8 @@ export class PreviewChatDto {
     @ApiProperty({ description: 'Chat ID' })
     id: string;
 
-    @ApiPropertyOptional({ description: 'Chat title' })
-    title?: string;
+    @ApiProperty({ description: 'Chat title' })
+    title: string | null;
 
     @ApiProperty({ description: 'Whether this is a group chat' })
     isGroup: boolean;
@@ -132,16 +122,16 @@ export class UpdateChatTitleResponseDto {
     @ApiProperty({ description: 'Chat ID' })
     chatId: string;
 
-    @ApiPropertyOptional({ description: 'New chat title' })
-    title?: string;
+    @ApiProperty({ description: 'New chat title' })
+    title: string | null;
 }
 
 export class CreateGroupChatResponseDto {
     @ApiProperty({ description: 'Chat ID' })
     id: string;
 
-    @ApiPropertyOptional({ description: 'Group title' })
-    title?: string;
+    @ApiProperty({ description: 'Group title' })
+    title: string | null;
 
     @ApiProperty({ description: 'Whether this is a group chat' })
     isGroup: boolean;
@@ -149,11 +139,11 @@ export class CreateGroupChatResponseDto {
     @ApiProperty({ description: 'Chat creation date' })
     createdAt: Date;
 
-    @ApiPropertyOptional({ description: 'Last message update time' })
-    lastMessageAt?: Date;
+    @ApiProperty({ description: 'Last message update time' })
+    lastMessageAt: Date | null;
 
-    @ApiPropertyOptional({ description: 'Latest messages' })
-    messages?: MessageDto[];
+    @ApiProperty({ description: 'Latest messages' })
+    messages: MessageDto[];
 
     @ApiProperty({ isArray: true, type: ParticipantDto })
     participants: ParticipantDto[];
@@ -195,9 +185,4 @@ export class LeaveGroupResponseDto {
 
     @ApiProperty({ description: 'Chat ID' })
     chatId: string;
-}
-
-export class SearchUsersToInviteResponseDto {
-    @ApiProperty({ isArray: true, type: UserDto })
-    data: UserDto[];
 }
