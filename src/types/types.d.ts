@@ -1,4 +1,4 @@
-import { RequestUser } from './src/auth/interfaces/request-user.interface';
+import { RequestUser } from '../auth/interfaces/request-user.interface';
 
 declare global {
     namespace Express {

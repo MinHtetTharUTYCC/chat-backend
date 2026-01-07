@@ -319,7 +319,6 @@
             "in": "query",
             "description": "Search query string",
             "schema": {
-              "minLength": 1,
               "example": "john",
               "type": "string"
             }
@@ -1226,7 +1225,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SearchUsersToInviteResponseDto"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
                 }
               }
             }
@@ -1592,7 +1594,6 @@
             "in": "query",
             "description": "Search query string",
             "schema": {
-              "minLength": 1,
               "example": "john",
               "type": "string"
             }
@@ -1670,7 +1671,6 @@
             "in": "query",
             "description": "Search query string",
             "schema": {
-              "minLength": 1,
               "example": "hello world",
               "type": "string"
             }
@@ -1975,7 +1975,7 @@
             "description": "Chat ID"
           },
           "title": {
-            "type": "string",
+            "type": "object",
             "description": "Chat title"
           },
           "isGroup": {
@@ -1988,8 +1988,7 @@
             "description": "Chat creation date"
           },
           "lastMessageAt": {
-            "format": "date-time",
-            "type": "string",
+            "type": "object",
             "description": "Last message update time"
           },
           "messages": {
@@ -2014,8 +2013,11 @@
         },
         "required": [
           "id",
+          "title",
           "isGroup",
           "createdAt",
+          "lastMessageAt",
+          "messages",
           "participants"
         ]
       },
@@ -2097,7 +2099,8 @@
           "createdAt",
           "updatedAt",
           "sender",
-          "isPinned"
+          "isPinned",
+          "pinnedByUserId"
         ]
       },
       "MessageMetaDto": {
@@ -2110,23 +2113,11 @@
           "prevCursor": {
             "type": "object",
             "description": "Cursor for loading newer messages"
-          },
-          "hasMoreNext": {
-            "type": "boolean",
-            "description": "Whether there are more newer messages"
-          },
-          "hasMorePrev": {
-            "type": "boolean",
-            "description": "Whether there are more older messages"
-          },
-          "anchorMessageId": {
-            "type": "string",
-            "description": "Anchor message ID if jumping to specific message"
           }
         },
         "required": [
-          "hasMoreNext",
-          "hasMorePrev"
+          "nextCursor",
+          "prevCursor"
         ]
       },
       "GetMessagesResponseDto": {
@@ -2318,6 +2309,18 @@
           "createdAt"
         ]
       },
+      "PinnedMessageMetaDto": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "object",
+            "description": "Cursor for loading older messages"
+          }
+        },
+        "required": [
+          "nextCursor"
+        ]
+      },
       "GetPinnedMessagesResponseDto": {
         "type": "object",
         "properties": {
@@ -2328,7 +2331,7 @@
             }
           },
           "meta": {
-            "$ref": "#/components/schemas/MessageMetaDto"
+            "$ref": "#/components/schemas/PinnedMessageMetaDto"
           }
         },
         "required": [
@@ -2392,12 +2395,13 @@
             "description": "Chat ID"
           },
           "title": {
-            "type": "string",
+            "type": "object",
             "description": "New chat title"
           }
         },
         "required": [
-          "chatId"
+          "chatId",
+          "title"
         ]
       },
       "CreateGroupChatDto": {
@@ -2468,7 +2472,7 @@
             "description": "Chat ID"
           },
           "title": {
-            "type": "string",
+            "type": "object",
             "description": "Group title"
           },
           "isGroup": {
@@ -2481,8 +2485,7 @@
             "description": "Chat creation date"
           },
           "lastMessageAt": {
-            "format": "date-time",
-            "type": "string",
+            "type": "object",
             "description": "Last message update time"
           },
           "messages": {
@@ -2501,8 +2504,11 @@
         },
         "required": [
           "id",
+          "title",
           "isGroup",
           "createdAt",
+          "lastMessageAt",
+          "messages",
           "participants"
         ]
       },
@@ -2586,20 +2592,6 @@
           "success",
           "chatId",
           "invitedMembersCount"
-        ]
-      },
-      "SearchUsersToInviteResponseDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserDto"
-            }
-          }
-        },
-        "required": [
-          "data"
         ]
       },
       "JoinGroupResponseDto": {
@@ -2799,7 +2791,8 @@
           "title": {
             "type": "object",
             "description": "Group title/name",
-            "example": "Team Alpha"
+            "example": "Team Alpha",
+            "nullable": true
           }
         },
         "required": [

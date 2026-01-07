@@ -32,7 +32,7 @@ export class WSJwtGuard implements CanActivate {
             };
 
             return true;
-        } catch (error) {
+        } catch {
             throw new UnauthorizedException('Invalid token');
         }
     }

@@ -4,7 +4,6 @@ import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SearchQueryDto } from 'src/search/dto/search.dto';
 import { ReqUser } from 'src/auth/request-user.decorator';
-import type { RequestUser } from 'src/auth/interfaces/request-user.interface';
 import {
     ApiBearerAuth,
     ApiBody,
@@ -18,6 +17,7 @@ import {
     UpdateUserResponseDto,
     UserResponseDto,
 } from './dto/response.user.dto';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -50,7 +50,9 @@ export class UsersController {
         status: 404,
         description: 'User not found',
     })
-    async getMe(@ReqUser() me: RequestUser): Promise<UserResponseDto> {
+    async getMe(
+        @ReqUser() me: authInterfaces.RequestUser,
+    ): Promise<UserResponseDto> {
         const user = await this.usersService.getMe(me.sub);
         return user;
     }
@@ -94,7 +96,7 @@ export class UsersController {
         description: 'User not found',
     })
     async updateUser(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Body() dto: UpdateUserDto,
     ): Promise<UpdateUserResponseDto> {
         return this.usersService.updateUser(me.sub, dto);
@@ -132,7 +134,7 @@ export class UsersController {
         description: 'Unauthorized - Invalid or missing token',
     })
     async searchUsers(
-        @ReqUser() me: RequestUser,
+        @ReqUser() me: authInterfaces.RequestUser,
         @Query() dto: SearchQueryDto,
     ): Promise<SearchUserResponseDto[]> {
         return this.usersService.searchUsers(me.sub, dto.q);

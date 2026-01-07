@@ -1,22 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class MessageMetaDto {
-    @ApiPropertyOptional({ description: 'Cursor for loading older messages' })
-    nextCursor?: string | null;
+    @ApiProperty({ description: 'Cursor for loading older messages' })
+    nextCursor: string | null;
 
-    @ApiPropertyOptional({ description: 'Cursor for loading newer messages' })
-    prevCursor?: string | null;
-
-    @ApiProperty({ description: 'Whether there are more newer messages' })
-    hasMoreNext: boolean;
-
-    @ApiProperty({ description: 'Whether there are more older messages' })
-    hasMorePrev: boolean;
-
-    @ApiPropertyOptional({
-        description: 'Anchor message ID if jumping to specific message',
-    })
-    anchorMessageId?: string;
+    @ApiProperty({ description: 'Cursor for loading newer messages' })
+    prevCursor: string | null;
 }
 
 export class MessageWithPinDto {
@@ -47,8 +36,8 @@ export class MessageWithPinDto {
     @ApiProperty({ description: 'Whether message is pinned' })
     isPinned: boolean;
 
-    @ApiPropertyOptional({ description: 'ID of user who pinned this message' })
-    pinnedByUserId?: string | null;
+    @ApiProperty({ description: 'ID of user who pinned this message' })
+    pinnedByUserId: string | null;
 }
 
 export class GetMessagesResponseDto {
@@ -141,12 +130,16 @@ export class PinnedMessageDto {
     createdAt: Date;
 }
 
+class PinnedMessageMetaDto {
+    @ApiProperty({ description: 'Cursor for loading older messages' })
+    nextCursor: string | null;
+}
 export class GetPinnedMessagesResponseDto {
     @ApiProperty({ isArray: true, type: PinnedMessageDto })
     pinnedMessages: PinnedMessageDto[];
 
-    @ApiProperty({ type: MessageMetaDto })
-    meta: MessageMetaDto;
+    @ApiProperty({ type: PinnedMessageMetaDto })
+    meta: PinnedMessageMetaDto;
 }
 
 export class PinMessageResponseDto {

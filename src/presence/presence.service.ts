@@ -1,12 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { RedisService } from 'src/redis/redis.service';
+import {
+    BulkPresenceResponseDto,
+    PresenceResponseDto,
+} from './dto/response.presence.dto';
 
 @Injectable()
 export class PresenceService {
     constructor(private readonly redisService: RedisService) {}
 
     async setOnline(userId: string) {
-        // SET ONLINE in Redis
         await this.redisService.client.set(`presence:${userId}`, 'online');
         await this.redisService.client.del(`lastseen:${userId}`);
         await this.redisService.client.expire(`presence:${userId}`, 300); // 5 min TTL
@@ -18,17 +21,12 @@ export class PresenceService {
         await this.redisService.client.set(`lastseen:${userId}`, date);
     }
 
-    // async setAway(userId: string) {
-    //     await this.redisService.client.set(`presence:${userId}`, 'away');
-    //     await this.redisService.client.expire(`presence:${userId}`, 300);
-    // }
-
     async heartbeating(userId: string) {
         //Refresh TTL
         await this.redisService.client.expire(`presence:${userId}`, 300); //5 minutes: 300 seconds
     }
 
-    async getPresence(userId: string) {
+    async getPresence(userId: string): Promise<PresenceResponseDto> {
         const online =
             (await this.redisService.client.get(`presence:${userId}`)) ===
             'online';
@@ -61,9 +59,7 @@ export class PresenceService {
         return onlineUsers;
     }
 
-    async getBulkPresence(userIds: string[]) {
-        if (userIds.length === 0) return;
-
+    async getBulkPresence(userIds: string[]): Promise<BulkPresenceResponseDto> {
         const pipeline = this.redisService.client.pipeline();
 
         userIds.forEach((userId) => {

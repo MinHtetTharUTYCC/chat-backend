@@ -11,8 +11,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import {
     SearchUserResponseDto,
     UpdateUserResponseDto,
-    UserResponseDto,
 } from './dto/response.user.dto';
+import { Prisma } from 'generated/prisma';
 
 @Injectable()
 export class UsersService {
@@ -38,7 +38,10 @@ export class UsersService {
                 },
             });
         } catch (error) {
-            if (error.code === 'P2002') {
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+            ) {
                 // prisma unique constriant
                 throw new BadRequestException('Email already exists');
             }
@@ -60,9 +63,7 @@ export class UsersService {
         );
         if (!isPwdValid) throw new BadRequestException('Invalid credentials');
 
-        // remove Pwd before return
-        const { password, ...cleanUser } = user;
-        return { ...cleanUser };
+        return { id: user.id, username: user.username, email: user.email };
     }
 
     // for refresh

@@ -1,12 +1,4 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    Req,
-    UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { PresenceService } from './presence.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { ChatService } from 'src/chat/chat.service';
@@ -23,6 +15,8 @@ import {
     BulkPresenceResponseDto,
     PresenceResponseDto,
 } from './dto/response.presence.dto';
+import { ReqUser } from 'src/auth/request-user.decorator';
+import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
 
 @ApiTags('presence')
 @ApiBearerAuth()
@@ -50,8 +44,10 @@ export class PresenceController {
         status: 401,
         description: 'Unauthorized - Invalid or missing token',
     })
-    async getOnlineFriends(@Req() req) {
-        const friendIds = await this.chatService.getMyFriendsIds(req.user.sub);
+    async getOnlineFriends(
+        @ReqUser() me: authInterfaces.RequestUser,
+    ): Promise<string[]> {
+        const friendIds = await this.chatService.getMyFriendsIds(me.sub);
         return this.presenceService.getOnlineUsers(friendIds);
     }
 
@@ -86,7 +82,9 @@ export class PresenceController {
         description: 'Bad request - Invalid user IDs',
     })
     @Post('bulk')
-    async getBulkPresence(@Body() body: BulkPresenceDto) {
+    async getBulkPresence(
+        @Body() body: BulkPresenceDto,
+    ): Promise<BulkPresenceResponseDto> {
         return this.presenceService.getBulkPresence(body.userIds);
     }
 
@@ -119,7 +117,7 @@ export class PresenceController {
         description: 'User not found',
     })
     @Get('/:userId')
-    getPresence(@Param('userId') userId: string) {
+    getPresence(@Param('userId') userId: string): Promise<PresenceResponseDto> {
         return this.presenceService.getPresence(userId);
     }
 }

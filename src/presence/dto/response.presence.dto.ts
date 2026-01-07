@@ -1,4 +1,9 @@
+import { IsString, ArrayNotEmpty, IsArray } from 'class-validator';
+
 export class BulkPresenceDto {
+    @IsArray()
+    @ArrayNotEmpty()
+    @IsString({ each: true })
     userIds: string[];
 }
 

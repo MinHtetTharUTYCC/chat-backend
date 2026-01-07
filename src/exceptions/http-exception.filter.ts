@@ -31,7 +31,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 : 'Internal server error';
 
         //log the error
-        if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+        if (status === (HttpStatus.INTERNAL_SERVER_ERROR as number)) {
             const errorMessage =
                 exception instanceof Error
                     ? exception.message
@@ -48,7 +48,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
             message:
                 typeof message === 'string'
                     ? message
-                    : (message as any).message || message,
+                    : (message as { message?: string }).message || message,
         });
     }
 }
