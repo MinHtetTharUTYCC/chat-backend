@@ -1,8 +1,9 @@
-import { MaxLength, MinLength } from 'class-validator';
+import { IsString, ArrayNotEmpty, IsArray } from 'class-validator';
 
 export class BulkPresenceDto {
-    @MinLength(1)
-    @MaxLength(100)
+    @IsArray()
+    @ArrayNotEmpty()
+    @IsString({ each: true })
     userIds: string[];
 }
 

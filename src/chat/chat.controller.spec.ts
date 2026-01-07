@@ -135,9 +135,9 @@ describe('ChatController', () => {
                 chatIdFromParams,
                 dto,
             );
-            expect(
-                jest.spyOn(messageService, 'getMessages'),
-            ).toHaveBeenCalledWith(
+
+            const getMessagesSpy = jest.spyOn(messageService, 'getMessages');
+            expect(getMessagesSpy).toHaveBeenCalledWith(
                 mockRequestUser.sub,
                 chatIdFromParams,
                 dto.cursor,

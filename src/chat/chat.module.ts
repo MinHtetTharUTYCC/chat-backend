@@ -7,11 +7,13 @@ import { DatabaseModule } from 'src/database/database.module';
 import { MessageModule } from 'src/message/message.module';
 import { PresenceModule } from 'src/presence/presence.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { CacheValidatorModule } from 'src/validator/cache.validator.module';
 
 @Module({
     imports: [
         DatabaseModule,
         NotificationModule,
+        CacheValidatorModule,
         forwardRef(() => MessageModule),
         forwardRef(() => PresenceModule),
         JwtModule.register({
