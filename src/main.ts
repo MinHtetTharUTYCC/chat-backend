@@ -15,7 +15,7 @@ async function bootstrap() {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
     app.enableCors({
-        origin: process.env.FRONTEND_URL || 'http://localhost:9000',
+        origin: process.env.FRONTEND_URL!,
         credentials: true,
     });
 
