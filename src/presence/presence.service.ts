@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RedisService } from 'src/redis/redis.service';
+import { RedisService } from '../redis/redis.service';
 import {
     BulkPresenceResponseDto,
     PresenceResponseDto,
@@ -96,3 +96,4 @@ export class PresenceService {
         return presence;
     }
 }
+

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { NotificationType } from 'generated/prisma';
+import { NotificationType } from '@prisma/client';
 
 export class ChatInfoDto {
     @ApiProperty({

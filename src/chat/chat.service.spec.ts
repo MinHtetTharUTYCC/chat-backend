@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatService } from './chat.service';
-import { MessageService } from 'src/message/message.service';
+import { MessageService } from '../message/message.service';
 import { ChatGateway } from './chat.gateway';
-import { NotificationService } from 'src/notification/notification.service';
-import { DatabaseService } from 'src/database/database.service';
+import { NotificationService } from '../notification/notification.service';
+import { DatabaseService } from '../database/database.service';
 import {
     BadRequestException,
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from 'generated/prisma';
-import { RedisService } from 'src/redis/redis.service';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import { RedisService } from '../redis/redis.service';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
+import { NotificationType } from '@prisma/client';
 describe('ChatService', () => {
     let service: ChatService;
     let databaseService: DatabaseService;

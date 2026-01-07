@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatController } from './chat.controller';
-import { MessageService } from 'src/message/message.service';
+import { MessageService } from '../message/message.service';
 import { ChatService } from './chat.service';
 import { StartChatDto } from './dto/startChat.dto';
 import { PaginationDto } from './dto/pagination.dto';
@@ -9,6 +9,7 @@ import { EditMessageDto } from './dto/edit-message.dto';
 import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { AddToChatDto } from './dto/add-to-chat.dto';
+import { describe } from 'node:test';
 
 describe('ChatController', () => {
     let controller: ChatController;
@@ -396,3 +397,4 @@ describe('ChatController', () => {
         });
     });
 });
+

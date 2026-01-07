@@ -10,7 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
 import { ChatService } from './chat.service';
-import { PresenceService } from 'src/presence/presence.service';
+import { PresenceService } from '../presence/presence.service';
 import { JwtService } from '@nestjs/jwt';
 import {
     forwardRef,
@@ -21,7 +21,7 @@ import {
     ValidationPipe,
 } from '@nestjs/common';
 import { TypingDto } from './dto/typing.dto';
-import { JwtPayloadOutput } from 'src/auth/interfaces/jwt-payload.interface';
+import { JwtPayloadOutput } from '../auth/interfaces/jwt-payload.interface';
 
 @Injectable()
 @WebSocketGateway({
@@ -202,3 +202,4 @@ export class ChatGateway
         return chatRooms;
     }
 }
+

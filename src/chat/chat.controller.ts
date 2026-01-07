@@ -9,18 +9,18 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { StartChatDto } from './dto/startChat.dto';
 import { SendMessageDto } from './dto/sendMessage.dto';
-import { MessageService } from 'src/message/message.service';
+import { MessageService } from '../message/message.service';
 import { UpdateChatTitleDto } from './dto/update-chat-title.dto';
 import { AddToChatDto } from './dto/add-to-chat.dto';
 import { CreateGroupChatDto } from './dto/create-group-chat.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { MessagesPaginationDto } from './dto/messages-pagination.dto';
-import { ReqUser } from 'src/auth/request-user.decorator';
+import { ReqUser } from '../auth/request-user.decorator';
 import { InviteToChatDto } from './dto/invite-to-chat.dto';
 import {
     ApiBearerAuth,
@@ -52,7 +52,7 @@ import {
     PinMessageResponseDto,
     UnpinMessageResponseDto,
 } from './dto/message-response.dto';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @ApiTags('chats')
 @ApiBearerAuth()
@@ -715,3 +715,4 @@ export class ChatController {
         return this.chatService.leaveGroup(me, chatId);
     }
 }
+

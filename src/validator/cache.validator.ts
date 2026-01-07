@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ChatListItemDto, FullChatDto } from 'src/chat/dto/chat-response.dto';
+import {
+    ChatListItemDto,
+    FullChatDto,
+} from '../chat/dto/chat-response.dto';
 import {
     GetMessagesResponseDto,
     GetPinnedMessagesResponseDto,
-} from 'src/chat/dto/message-response.dto';
+} from '../chat/dto/message-response.dto';
 
 @Injectable()
 export class CacheValidator {
@@ -39,3 +42,4 @@ export class CacheValidator {
         );
     }
 }
+

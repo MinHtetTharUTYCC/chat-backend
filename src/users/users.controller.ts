@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { SearchQueryDto } from 'src/search/dto/search.dto';
-import { ReqUser } from 'src/auth/request-user.decorator';
+import { SearchQueryDto } from '../search/dto/search.dto';
+import { ReqUser } from '../auth/request-user.decorator';
 import {
     ApiBearerAuth,
     ApiBody,
@@ -17,7 +17,7 @@ import {
     UpdateUserResponseDto,
     UserResponseDto,
 } from './dto/response.user.dto';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -140,3 +140,4 @@ export class UsersController {
         return this.usersService.searchUsers(me.sub, dto.q);
     }
 }
+

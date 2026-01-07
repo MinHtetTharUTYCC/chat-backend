@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SearchService } from './search.service';
 import { SearchQueryDto } from './dto/search.dto';
-import { ReqUser } from 'src/auth/request-user.decorator';
+import { ReqUser } from '../auth/request-user.decorator';
 import {
     MessageSearchResultDto,
     SearchChatsResponseDto,
@@ -15,7 +15,7 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @ApiTags('search')
 @ApiBearerAuth()
@@ -125,3 +125,4 @@ export class SearchController {
         return this.searchService.searchMessageInChat(me.sub, chatId, dto.q);
     }
 }
+

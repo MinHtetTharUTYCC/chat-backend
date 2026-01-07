@@ -1,8 +1,8 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
-import { PaginationDto } from 'src/chat/dto/pagination.dto';
-import { ReqUser } from 'src/auth/request-user.decorator';
+import { PaginationDto } from '../chat/dto/pagination.dto';
+import { ReqUser } from '../auth/request-user.decorator';
 import {
     ApiBearerAuth,
     ApiOperation,
@@ -11,7 +11,7 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { PaginatedNotificationsResponseDto } from './dto/response.notification.dto';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -83,3 +83,4 @@ export class NotificationController {
         );
     }
 }
+

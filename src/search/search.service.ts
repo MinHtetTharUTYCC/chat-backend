@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import {
     MessageSearchResultDto,
     SearchChatsResponseDto,
@@ -92,3 +92,4 @@ export class SearchService {
         return messages;
     }
 }
+

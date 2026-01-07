@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { PresenceService } from './presence.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { ChatService } from 'src/chat/chat.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ChatService } from '../chat/chat.service';
 import {
     ApiBearerAuth,
     ApiBody,
@@ -15,8 +15,8 @@ import {
     BulkPresenceResponseDto,
     PresenceResponseDto,
 } from './dto/response.presence.dto';
-import { ReqUser } from 'src/auth/request-user.decorator';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import { ReqUser } from '../auth/request-user.decorator';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @ApiTags('presence')
 @ApiBearerAuth()
@@ -121,3 +121,4 @@ export class PresenceController {
         return this.presenceService.getPresence(userId);
     }
 }
+

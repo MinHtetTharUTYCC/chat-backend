@@ -3,11 +3,11 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { JwtModule } from '@nestjs/jwt';
-import { DatabaseModule } from 'src/database/database.module';
-import { MessageModule } from 'src/message/message.module';
-import { PresenceModule } from 'src/presence/presence.module';
-import { NotificationModule } from 'src/notification/notification.module';
-import { CacheValidatorModule } from 'src/validator/cache.validator.module';
+import { DatabaseModule } from '../database/database.module';
+import { MessageModule } from '../message/message.module';
+import { PresenceModule } from '../presence/presence.module';
+import { NotificationModule } from '../notification/notification.module';
+import { CacheValidatorModule } from '../validator/cache.validator.module';
 
 @Module({
     imports: [
@@ -25,3 +25,4 @@ import { CacheValidatorModule } from 'src/validator/cache.validator.module';
     exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}
+

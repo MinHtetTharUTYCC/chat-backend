@@ -1,8 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { PresenceController } from './presence.controller';
 import { PresenceService } from './presence.service';
-import { RedisModule } from 'src/redis/redis.module';
-import { ChatModule } from 'src/chat/chat.module';
+import { RedisModule } from '../redis/redis.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
     imports: [RedisModule, forwardRef(() => ChatModule)],
@@ -11,3 +11,4 @@ import { ChatModule } from 'src/chat/chat.module';
     exports: [PresenceService],
 })
 export class PresenceModule {}
+

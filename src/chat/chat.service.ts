@@ -6,13 +6,13 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { ChatGateway } from './chat.gateway';
-import { NotificationService } from 'src/notification/notification.service';
-import { MessageService } from 'src/message/message.service';
-import { RedisService } from 'src/redis/redis.service';
-import { NotificationType, Prisma } from 'generated/prisma';
-import { generateDmKey } from 'src/utils/chat.utils';
+import { NotificationService } from '../notification/notification.service';
+import { MessageService } from '../message/message.service';
+import { RedisService } from '../redis/redis.service';
+import { NotificationType, Prisma } from '@prisma/client';
+import { generateDmKey } from '../utils/chat.utils';
 import {
     AddToGroupChatResponseDto,
     ChatListItemDto,
@@ -26,8 +26,8 @@ import {
     UpdateChatTitleResponseDto,
     UserDto,
 } from './dto/chat-response.dto';
-import { CacheValidator } from 'src/validator/cache.validator';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
+import { CacheValidator } from '../validator/cache.validator';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 
 @Injectable()
 export class ChatService {
@@ -1002,7 +1002,7 @@ export class ChatService {
         }
 
         const availabeUsers = await this.databaseService.user.findMany({
-            where,
+            where: where,
             select: {
                 id: true,
                 username: true,

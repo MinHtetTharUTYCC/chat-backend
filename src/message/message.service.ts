@@ -5,11 +5,10 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from 'generated/prisma';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
-import * as authInterfaces from 'src/auth/interfaces/auth.interfaces';
-import { ChatGateway } from 'src/chat/chat.gateway';
-import { MessageDto } from 'src/chat/dto/chat-response.dto';
+import { NotificationType } from '@prisma/client';
+import * as authInterfaces from '../auth/interfaces/auth.interfaces';
+import { ChatGateway } from '../chat/chat.gateway';
+import { MessageDto } from '../chat/dto/chat-response.dto';
 import {
     DeleteMessageResponseDto,
     EditMessageResponseDto,
@@ -18,11 +17,12 @@ import {
     PinMessageResponseDto,
     SendMessageResponseDto,
     UnpinMessageResponseDto,
-} from 'src/chat/dto/message-response.dto';
-import { DatabaseService } from 'src/database/database.service';
-import { NotificationService } from 'src/notification/notification.service';
-import { RedisService } from 'src/redis/redis.service';
-import { CacheValidator } from 'src/validator/cache.validator';
+} from '../chat/dto/message-response.dto';
+import { DatabaseService } from '../database/database.service';
+import { NotificationService } from '../notification/notification.service';
+import { RedisService } from '../redis/redis.service';
+import { CacheValidator } from '../validator/cache.validator';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
 @Injectable()
 export class MessageService {
