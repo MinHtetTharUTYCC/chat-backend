@@ -9,6 +9,7 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
+import { ConfigService } from '@nestjs/config';
 
 type Payload = {
     sub: string;
@@ -19,8 +20,9 @@ type Payload = {
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
     constructor(
-        private jwt: JwtService,
+        private jwtService: JwtService,
         private readonly usersService: UsersService,
+        private configService: ConfigService,
     ) {}
 
     async getTokens(userId: string, username: string) {
@@ -29,18 +31,20 @@ export class AuthService {
             username,
         };
 
-        const accessSecret = process.env.JWT_ACCESS_SECRET;
-        const refreshSecret = process.env.JWT_REFRESH_SECRET;
+        const accessSecret =
+            this.configService.get<string>('JWT_ACCESS_SECRET');
+        const refreshSecret =
+            this.configService.get<string>('JWT_REFRESH_SECRET');
 
         if (!accessSecret || !refreshSecret) {
-            throw new Error('JWT secrets not configured');
+            throw new Error('JWT secrets and expires not configured');
         }
 
-        const accessToken = await this.jwt.signAsync(payload, {
+        const accessToken = await this.jwtService.signAsync(payload, {
             secret: accessSecret,
-            expiresIn: '3h',
+            expiresIn: '1h',
         });
-        const refreshToken = await this.jwt.signAsync(payload, {
+        const refreshToken = await this.jwtService.signAsync(payload, {
             secret: refreshSecret,
             expiresIn: '7d',
         });
