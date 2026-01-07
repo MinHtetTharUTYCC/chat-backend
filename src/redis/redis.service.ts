@@ -5,7 +5,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -15,29 +15,49 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     constructor(private configService: ConfigService) {}
 
     async onModuleInit() {
-        const redisConfig = {
-            host: this.configService.get<string>('REDIS_HOST') || '127.0.0.1',
-            port: this.configService.get<number>('REDIS_PORT') || 6379,
-            password: this.configService.get<string>('REDIS_PASSWORD'),
-            retryStrategy: (times: number) => {
-                const delay = Math.min(times * 50, 2000);
-                return delay;
-            },
-            maxRetriesPerRequest: 3,
-        };
+        const redisUrl = this.configService.get<string>('REDIS_URL');
+        const redisHost = this.configService.get<string>('REDIS_HOST');
+        const redisPort = this.configService.get<number>('REDIS_PORT');
+        const redisPassword = this.configService.get<string>('REDIS_PASSWORD');
 
-        if (!redisConfig.password) {
-            this.logger.warn('REDIS_PASSWORD not configured!');
+        let redisConfig: RedisOptions;
+
+        if (redisUrl) {
+            this.client = new Redis(redisUrl, {
+                retryStrategy: (times: number) => {
+                    const delay = Math.min(times * 50, 2000);
+                    return delay;
+                },
+                maxRetriesPerRequest: 3,
+            });
+        } else if (redisHost) {
+            redisConfig = {
+                host: redisHost || '127.0.0.1',
+                port: redisPort || 6379,
+                password: redisPassword,
+                retryStrategy: (times: number) => {
+                    const delay = Math.min(times * 50, 2000);
+                    return delay;
+                },
+                maxRetriesPerRequest: 3,
+            };
+            this.client = new Redis(redisConfig);
+        } else {
+            this.client = new Redis({
+                host: '127.0.0.1',
+                port: 6379,
+                retryStrategy: (times: number) => {
+                    const delay = Math.min(times * 50, 2000);
+                    return delay;
+                },
+                maxRetriesPerRequest: 3,
+            });
         }
 
-        this.logger.log(
-            `Connecting to Redis at ${redisConfig.host}:${redisConfig.port}`,
-        );
-
-        this.client = new Redis(redisConfig);
-
         this.client.on('connect', () => {
-            this.logger.log('Redis connected');
+            this.logger.log(
+                `Connected to Redis at ${redisUrl || `${redisHost}:${redisPort || 6379}`}`,
+            );
         });
 
         this.client.on('ready', () => {
