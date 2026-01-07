@@ -22,8 +22,10 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
 
+    "skipDefaultLibCheck": true,
+
     "typeRoots": ["./node_modules/@types","./src/types"],
-    "types": ["node"],
+    "types": [],
   },
   "include": ["src/**/*"]
 }
