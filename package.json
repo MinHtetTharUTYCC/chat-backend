@@ -9,7 +9,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc --skipLibCheck --skipDefaultLibCheck -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -27,8 +27,8 @@
     "db:supabase:push": "dotenv -e .env.production -- prisma db push",
     "db:studio:neon": "dotenv -e .env.production -- prisma studio",
     "generate": "prisma generate",
-    "render:build": "npm run build && npm run prisma:generate",
-    "render:start": "npm run prisma:migrate && npm run start:prod"
+    "render:build": "npm ci --include=dev && npm run build && npx prisma generate",
+    "render:start": "npx prisma migrate deploy && node dist/main"
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.14",
@@ -46,7 +46,6 @@
     "@prisma/client": "^7.2.0",
     "@types/cookie-parser": "^1.4.10",
     "bcrypt": "^6.0.0",
-    "@types/node": "^22.19.3",
     "cache-manager": "^5.7.6",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -70,8 +69,9 @@
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/cache-manager": "^5.0.0",
-    "@types/express": "^5.0.0",
+    "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
+    "@types/node": "^20.19.27",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.16.0",
     "@types/supertest": "^6.0.2",

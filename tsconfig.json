@@ -15,17 +15,19 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
+
     "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
 
-    "skipDefaultLibCheck": true,
 
     "typeRoots": ["./node_modules/@types","./src/types"],
-    "types": [],
+    "types": ["node"],
   },
   "include": ["src/**/*"]
 }
