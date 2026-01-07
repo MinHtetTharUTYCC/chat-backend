@@ -31,6 +31,7 @@
     "render:start": "npm run prisma:migrate && npm run start:prod"
   },
   "dependencies": {
+    "@nestjs/cli": "^11.0.14",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
