@@ -363,10 +363,62 @@
         ]
       }
     },
+    "/chats/search": {
+      "get": {
+        "operationId": "ChatController_searchChats",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Search query for chat title and DM user name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "searched result chats list the user participates in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatListItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "search chats list of the current user",
+        "tags": [
+          "chats"
+        ]
+      }
+    },
     "/chats": {
       "get": {
         "operationId": "ChatController_getAllChats",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of all chats the user participates in",

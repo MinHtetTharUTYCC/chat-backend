@@ -33,7 +33,7 @@ import * as authInterfaces from '../auth/interfaces/auth.interfaces';
 export class ChatService {
     private readonly logger = new Logger(ChatService.name);
 
-    // Standard include pattern for chat items in list/response views
+    // include pattern for chat items list
     private readonly chatItemInclude = {
         messages: {
             include: {
@@ -103,6 +103,42 @@ export class ChatService {
 
         //save to redis(TTL-time_to_live: 5min)
         await this.redisService.set(cacheKey, JSON.stringify(chats), 300);
+
+        return chats;
+    }
+
+    async searchChats(userId: string, q?: string): Promise<ChatListItemDto[]> {
+        const chats = await this.databaseService.chat.findMany({
+            where: {
+                participants: {
+                    some: { userId },
+                },
+                ...(q && {
+                    OR: [
+                        {
+                            isGroup: true,
+                            title: { contains: q, mode: 'insensitive' },
+                        },
+                        {
+                            isGroup: false,
+                            participants: {
+                                some: {
+                                    userId: { not: userId },
+                                    user: {
+                                        username: {
+                                            contains: q,
+                                            mode: 'insensitive',
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                }),
+            },
+            include: this.chatItemInclude,
+            orderBy: [{ updatedAt: 'desc' }],
+        });
 
         return chats;
     }

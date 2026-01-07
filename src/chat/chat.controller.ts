@@ -64,6 +64,31 @@ export class ChatController {
         private readonly messageService: MessageService,
     ) {}
 
+    @Get('/search')
+    @ApiOperation({
+        summary: 'search chats list of the current user',
+    })
+    @ApiQuery({
+        name: 'q',
+        required: false,
+        description: 'Search query for chat title and DM user name',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'searched result chats list the user participates in',
+        type: [ChatListItemDto],
+    })
+    @ApiResponse({
+        status: 401,
+        description: 'Unauthorized',
+    })
+    async searchChats(
+        @ReqUser() me: authInterfaces.RequestUser,
+        @Query('q') q: string,
+    ): Promise<ChatListItemDto[]> {
+        return this.chatService.searchChats(me.sub, q);
+    }
+
     @Get()
     @ApiOperation({ summary: 'Get all chats for the current user' })
     @ApiResponse({
@@ -77,6 +102,7 @@ export class ChatController {
     })
     async getAllChats(
         @ReqUser() me: authInterfaces.RequestUser,
+        @Query('q') q: string,
     ): Promise<ChatListItemDto[]> {
         return this.chatService.getAllChats(me.sub);
     }
@@ -715,4 +741,3 @@ export class ChatController {
         return this.chatService.leaveGroup(me, chatId);
     }
 }
-
