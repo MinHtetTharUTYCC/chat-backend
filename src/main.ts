@@ -48,6 +48,7 @@ async function bootstrap() {
         res.send(document);
     });
 
-    await app.listen(process.env.PORT ?? 7000);
+    const port = process.env.PORT ?? 10000;
+    await app.listen(port, '0.0.0.0');
 }
 bootstrap();
