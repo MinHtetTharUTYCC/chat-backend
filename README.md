@@ -1,218 +1,161 @@
-**Project Description**
+# Chat Backend
+[![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/MinHtetTharUTYCC/chat-backend)
 
-- **Overview:**: A real-time chat backend built with NestJS and TypeScript. It provides authentication (JWT access + refresh tokens), presence tracking, WebSocket-based real-time messaging (Socket.IO-compatible gateway), and persistence via Prisma. The project is organized into feature modules such as `auth`, `users`, `chat`, `message`, and `notification`.
+This repository contains the backend service for a real-time chat application. It is built with NestJS and provides a feature-rich API for handling user authentication, real-time messaging, presence tracking, notifications, and more.
 
-**Tech Stack**
+## Features
 
-- **Framework**: NestJS (modular, decorators-based server)
-- **Language**: TypeScript
-- **Database / ORM**: Prisma (schema in `prisma/schema.prisma`) — typically used with PostgreSQL or MySQL via `DATABASE_URL`.
-- **Auth**: JWT (access + refresh tokens) using `@nestjs/jwt` and Passport strategies
-- **Real-time**: WebSocket gateway implemented with NestJS Gateway + `socket.io` types (server-side `socket.io` usage in `src/chat/chat.gateway.ts`).
-- **Cache / Presence**: Redis (optional) — presence and caching helpers are present in `src/redis` and `src/presence`.
-- **Other libs**: `bcrypt` for password hashing, `cookie-parser` for cookie handling, `class-validator` / `class-transformer` for DTO validation.
+-   **Authentication**: Secure user registration and login using JWT (Access and Refresh Tokens). Refresh tokens are stored in `httpOnly` cookies for security.
+-   **Real-Time Communication**: WebSocket-based messaging using Socket.IO for instant message delivery, typing indicators, and presence updates.
+-   **Chat Management**: APIs for creating direct messages and group chats, adding/inviting members, updating chat titles, and searching chats.
+-   **Message Handling**: Send, edit, and delete messages. Support for pinning/unpinning important messages within a chat.
+-   **Presence System**: Real-time tracking of user online/offline status using Redis.
+-   **Notifications**: In-app notifications for events like new messages, group invites, and message pins.
+-   **Comprehensive Search**: Endpoints to search for users, groups, and messages within a specific chat.
+-   **Database**: Uses Prisma as the ORM for seamless database interaction with PostgreSQL.
+-   **API Documentation**: Auto-generated API documentation available via Swagger UI.
 
-**Getting Started**
+## Tech Stack
 
-- **Prerequisites**:
-  - Node.js (v18+ recommended)
-  - npm (or yarn/pnpm)
-  - A running relational database (Postgres / MySQL) and a configured `DATABASE_URL` for Prisma
-  - (Optional) Redis instance for presence/caching if you plan to enable those features
+-   **Framework**: [NestJS](https://nestjs.com/)
+-   **Language**: [TypeScript](https://www.typescriptlang.org/)
+-   **Database ORM**: [Prisma](https://www.prisma.io/)
+-   **Database**: [PostgreSQL](https://www.postgresql.org/)
+-   **Real-time Layer**: [Socket.IO](https://socket.io/)
+-   **Caching & Presence**: [Redis](https://redis.io/)
+-   **Authentication**: [Passport.js](http://www.passportjs.org/) (JWT Strategy)
+-   **Validation**: `class-validator`, `class-transformer`
 
-- **Environment**:
-  - Create a `.env` file in the project root containing at minimum:
-    - `DATABASE_URL` (Prisma)
-    - `JWT_ACCESS_SECRET` (string)
-    - `JWT_REFRESH_SECRET` (string)
-    - `PORT` (optional)
-    - `REDIS_URL` (optional)
+## Getting Started
 
-- **Install Dependencies**:
+### Prerequisites
 
-```powershell
-cd /path/to/chat-backend
-npm install
-```
+-   Node.js (v18 or higher)
+-   npm or a compatible package manager
+-   Docker and Docker Compose
+-   A code editor like VS Code
 
-- **Prisma setup / Migrations**:
+### Environment Setup
 
-```powershell
-# generate prisma client
-npx prisma generate
+1.  Clone the repository:
+    ```sh
+    git clone https://github.com/MinHtetTharUTYCC/chat-backend.git
+    cd chat-backend
+    ```
 
-# Run migrations in development (creates and applies a migration)
-npx prisma migrate dev
+2.  Create a `.env` file in the root directory and populate it with the necessary environment variables. You can use the `docker-compose.yaml` file as a reference for database and Redis credentials.
 
-# Or deploy migrations in production
-npx prisma migrate deploy
-```
+    **`.env` example:**
 
-- **Run the app**:
+    ```env
+    # Application Port
+    PORT=7000
 
-```powershell
-# development (watch)
-npm run start:dev
+    # Frontend URL for CORS
+    FRONTEND_URL=http://localhost:9000
 
-# production
-npm run build
-npm run start:prod
-```
+    # PostgreSQL Connection URL (for Prisma and the app)
+    # The credentials should match those in docker-compose.yaml
+    DATABASE_URL="postgresql://myuser:mypassword@localhost:5432/chatdb?schema=public"
 
-**Environment examples**
+    # Redis Connection URL
+    # Password should match the one in docker-compose.yaml
+    REDIS_URL="redis://:mypassword@localhost:6379"
 
-Create a `.env` with (example values):
+    # JWT Secrets (use strong, unique secrets)
+    JWT_ACCESS_SECRET="your-strong-access-secret"
+    JWT_REFRESH_SECRET="your-strong-refresh-secret"
+    ```
 
-```
-DATABASE_URL="postgresql://user:pass@localhost:5432/chatdb"
-JWT_ACCESS_SECRET="your_access_secret_here"
-JWT_REFRESH_SECRET="your_refresh_secret_here"
-PORT=7000
-REDIS_URL="redis://localhost:6379"
-```
+### Installation and Database
 
-**API Endpoints**
+1.  Install project dependencies:
+    ```sh
+    npm install
+    ```
 
-- **Authentication** (`src/auth/auth.controller.ts`)
-  - `POST /auth/register` : Register a new user. Request body: registration DTO (email, password, ...). Returns `accessToken` and sets an HTTP-only `refresh_token` cookie.
-  - `POST /auth/login` : Login with credentials. Request body: login DTO (email, password). Returns `accessToken` and sets `refresh_token` cookie.
-  - `POST /auth/refresh` : Exchange refresh cookie for a new access token. Uses a guard that reads the `refresh_token` cookie. Returns a fresh `accessToken` and rotates the refresh cookie.
-  - `POST /auth/logout` : Invalidates refresh token server-side and clears the `refresh_token` cookie. Requires a valid access token.
+2.  Start the PostgreSQL database and Redis services using Docker Compose:
+    ```sh
+    docker-compose up -d
+    ```
 
-- **WebSocket (Real-time)** (`src/chat/chat.gateway.ts`)
-  - Connect: When initializing a socket connection, pass the JWT access token in the `auth` handshake payload, for example:
+3.  Apply database migrations using Prisma:
+    ```sh
+    npx prisma migrate dev
+    ```
 
-```js
-// client-side socket.io connect example
-const socket = io(SERVER_URL, { auth: { token: ACCESS_TOKEN } });
-```
+4.  Generate the Prisma Client:
+    ```sh
+    npx prisma generate
+    ```
 
-  - Events emitted by server:
-    - `presence_update` : informs relevant friend rooms of user online/offline changes
-    - `user_typing` : volatile typing indicator forwarded to a chat room
+### Running the Application
 
-  - Client -> Server events handled:
-    - `join_chat` (payload: `chatId`) — join a chat room
-    - `typing` (payload: `{ chatId, isTyping }`) — forwarded as `user_typing` to the room
+-   **Development Mode (with hot-reloading):**
+    ```sh
+    npm run start:dev
+    ```
+    The application will be running on `http://localhost:7000`.
 
-- **Other REST modules**
-  - The repo contains additional controllers and modules for `users`, `chat`, `message`, and `notification` (look under `src/`). Inspect those controllers for full REST API details and request/response DTOs.
+-   **Production Mode:**
+    ```sh
+    npm run build
+    npm run start:prod
+    ```
 
-**Notes & Security**
+## API Documentation
 
-- Access tokens are short-lived and returned in responses (`accessToken`). Refresh tokens are stored in a secure, httpOnly cookie scoped to `/auth/refresh` and rotated on refresh.
-- Make sure to set strong `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values in production and to run over HTTPS so cookies set with `secure: true` are usable.
+Once the application is running, you can access the full API documentation, generated by Swagger, at:
 
-**Troubleshooting**
+`http://localhost:7000/api-docs`
 
-- If strategies complain about missing config during app bootstrap, ensure `ConfigModule` (or a `.env` loader) is initialized early and that `ConfigService` is available to providers that need environment values.
-- Prisma errors: ensure `DATABASE_URL` is valid and migrations have been applied.
+This interactive UI provides detailed information on all available endpoints, request bodies, and response schemas.
 
-**Development Tips**
+## Key API Endpoints & Events
 
-- Use `npm run start:dev` for automatic reloads during development.
-- Use Postman / HTTP client for auth endpoints, and a Socket.IO client (or your frontend) for realtime testing.
+### Authentication (`/auth`)
 
-**License**
+-   `POST /register`: Creates a new user account.
+-   `POST /login`: Authenticates a user and returns an access token. Sets a refresh token in an `httpOnly` cookie.
+-   `POST /refresh`: Uses the refresh token cookie to issue a new access token.
+-   `POST /logout`: Clears the user's refresh token from the database.
 
-- This project is licensed under the MIT License. See `LICENSE` for details.
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+### WebSocket Events
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The WebSocket gateway handles real-time communication. Clients should connect with their JWT access token in the `auth` payload.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+-   **Client to Server:**
+    -   `user_online`: Notifies the server that the user is online.
+    -   `user_offline`: Notifies the server that the user is going offline.
+    -   `heartbeat`: Sent periodically to maintain the "online" status.
+    -   `join_chat`: Makes the client's socket join a specific chat room.
+    -   `typing`: Emits a typing indicator to other users in a chat.
 
-## Description
+-   **Server to Client:**
+    -   `new_message`: A new message has been sent in a chat.
+    -   `message_edited`, `message_deleted`: A message has been modified or removed.
+    -   `pin_added`, `pin_removed`: A message has been pinned or unpinned.
+    -   `presence_update`: A user's online status has changed.
+    -   `user_typing`: A user is currently typing in a chat.
+    -   `new_chat`, `group_added`, `group_invited`: Notifications for new chats or group activities.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Project Structure
 
-## Project setup
+The backend is organized into modules, each responsible for a specific domain:
 
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
+-   `src/auth`: Handles user authentication, JWT strategies, and guards.
+-   `src/users`: Manages user profiles and user search.
+-   `src/chat`: Core module for chat management and the WebSocket gateway.
+-   `src/message`: Handles creating, retrieving, and managing messages.
+-   `src/notification`: Manages in-app notifications.
+-   `src/presence`: User online/offline status management.
+-   `src/search`: Provides search functionality across users, groups, and messages.
+-   `src/database`: Contains the Prisma database service configuration.
+-   `src/redis`: Contains the Redis service configuration.
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+This application includes configuration files for deployment on [Render](https://render.com/) and via Docker.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/MinHtetTharUTYCC/chat-backend?utm_source=oss&utm_medium=github&utm_campaign=MinHtetTharUTYCC%2Fchat-backend&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+-   **Render**: The `render.yaml` file defines the service, build commands, and environment variables for one-click deployment on Render.
+-   **Docker**: The `docker-compose.yaml` file is configured for a local development environment but can be adapted for production use to deploy the database and Redis instances. The application itself can be containerized using a `Dockerfile`.
