@@ -9,6 +9,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Response } from 'express';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
         logger: ['error', 'warn', 'debug', 'verbose', 'log'],
@@ -17,7 +19,9 @@ async function bootstrap() {
     app.set('trust proxy', 1);
 
     app.enableCors({
-        origin: [process.env.FRONTEND_URL!, process.env.FRONTEND_URL_PROD!],
+        origin: isProd
+            ? process.env.FRONTEND_URL_PROD!
+            : process.env.FRONTEND_URL!,
         credentials: true,
     });
 

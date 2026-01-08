@@ -32,6 +32,8 @@ import {
 import { ReqUser } from './request-user.decorator';
 import * as authInterfaces from './interfaces/auth.interfaces';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
@@ -93,8 +95,8 @@ export class AuthController {
         // set refresh tokens only in httpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: 'lax',
             path: '/',
         });
 
@@ -158,8 +160,8 @@ export class AuthController {
         // set refresh tokens only in HttpOnly cookie
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: 'lax',
             path: '/',
         });
 
@@ -215,8 +217,8 @@ export class AuthController {
 
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: 'lax',
             path: '/',
         });
 
@@ -261,8 +263,8 @@ export class AuthController {
         //clear cookie in client
         res.clearCookie('refresh_token', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
+            secure: isProd,
+            sameSite: 'lax',
             path: '/',
         });
 
