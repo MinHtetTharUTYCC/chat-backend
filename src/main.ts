@@ -17,7 +17,7 @@ async function bootstrap() {
     app.set('trust proxy', 1);
 
     app.enableCors({
-        origin: process.env.FRONTEND_URL!,
+        origin: [process.env.FRONTEND_URL!, process.env.FRONTEND_URL_PROD!],
         credentials: true,
     });
 
